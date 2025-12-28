@@ -1,3 +1,4 @@
+import { useNavigate } from "react-router-dom";
 import { Bell, Search, ChevronDown, User, LogOut, Settings, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +10,28 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface AppHeaderProps {
   sidebarCollapsed: boolean;
 }
 
 export function AppHeader({ sidebarCollapsed }: AppHeaderProps) {
+  const navigate = useNavigate();
+  const { profile, roles, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/auth");
+  };
+
+  const userInitials = profile?.full_name
+    ? profile.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    : profile?.email?.slice(0, 2).toUpperCase() || "U";
+
+  const userRole = roles[0]?.role || "User";
+
   return (
     <header
       className={`fixed top-0 right-0 z-30 h-16 bg-card border-b border-border transition-all duration-300 ${
@@ -50,6 +67,9 @@ export function AppHeader({ sidebarCollapsed }: AppHeaderProps) {
 
         {/* Right Section */}
         <div className="flex items-center gap-3">
+          {/* Theme Toggle */}
+          <ThemeToggle />
+
           {/* Notifications */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -92,11 +112,11 @@ export function AppHeader({ sidebarCollapsed }: AppHeaderProps) {
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="gap-2">
                 <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-                  <span className="text-primary-foreground text-sm font-medium">JD</span>
+                  <span className="text-primary-foreground text-sm font-medium">{userInitials}</span>
                 </div>
                 <div className="text-left hidden md:block">
-                  <p className="text-sm font-medium">John Doe</p>
-                  <p className="text-xs text-muted-foreground">Store Manager</p>
+                  <p className="text-sm font-medium">{profile?.full_name || profile?.email || "User"}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{userRole}</p>
                 </div>
                 <ChevronDown className="h-4 w-4 text-muted-foreground" />
               </Button>
@@ -115,7 +135,7 @@ export function AppHeader({ sidebarCollapsed }: AppHeaderProps) {
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </DropdownMenuItem>
