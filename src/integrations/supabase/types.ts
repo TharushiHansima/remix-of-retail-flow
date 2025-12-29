@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      approvals: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          metadata: Json | null
+          requested_at: string | null
+          requested_by: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          rule_id: string
+          rule_name: string
+          status: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          metadata?: Json | null
+          requested_at?: string | null
+          requested_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          rule_id: string
+          rule_name: string
+          status?: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          metadata?: Json | null
+          requested_at?: string | null
+          requested_by?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          rule_id?: string
+          rule_name?: string
+          status?: string
+        }
+        Relationships: []
+      }
       batches: {
         Row: {
           batch_number: string
