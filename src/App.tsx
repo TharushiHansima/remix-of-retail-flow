@@ -22,6 +22,10 @@ import Invoices from "./pages/Invoices";
 import GRN from "./pages/GRN";
 import StockTransfers from "./pages/StockTransfers";
 import StockAdjustments from "./pages/StockAdjustments";
+import ModulesConfig from "./pages/config/ModulesConfig";
+import SystemSettings from "./pages/config/SystemSettings";
+import WorkflowsConfig from "./pages/config/WorkflowsConfig";
+import ApprovalsConfig from "./pages/config/ApprovalsConfig";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +56,10 @@ const App = () => (
                     <Route path="/suppliers/orders" element={<PurchaseOrders />} />
                     <Route path="/suppliers/grn" element={<GRN />} />
                     <Route path="/config/users" element={<UsersRoles />} />
+                    <Route path="/config/modules" element={<ModulesConfig />} />
+                    <Route path="/config/system" element={<SystemSettings />} />
+                    <Route path="/config/workflows" element={<WorkflowsConfig />} />
+                    <Route path="/config/approvals" element={<ApprovalsConfig />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<NotFound />} />
