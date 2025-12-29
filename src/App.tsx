@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { ConfigProvider } from "@/contexts/ConfigContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
 import Auth from "./pages/Auth";
@@ -29,33 +30,35 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider>
       <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route element={<ProtectedRoute />}>
-                <Route element={<AppLayout />}>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/pos" element={<POS />} />
-                  <Route path="/sales/invoices" element={<Invoices />} />
-                  <Route path="/inventory/products" element={<Products />} />
-                  <Route path="/inventory/transfers" element={<StockTransfers />} />
-                  <Route path="/inventory/adjustments" element={<StockAdjustments />} />
-                  <Route path="/repairs/jobs" element={<JobCards />} />
-                  <Route path="/repairs/board" element={<TechnicianBoard />} />
-                  <Route path="/customers" element={<Customers />} />
-                  <Route path="/reports/sales" element={<SalesReports />} />
-                  <Route path="/suppliers/orders" element={<PurchaseOrders />} />
-                  <Route path="/suppliers/grn" element={<GRN />} />
-                  <Route path="/config/users" element={<UsersRoles />} />
+        <ConfigProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<AppLayout />}>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/pos" element={<POS />} />
+                    <Route path="/sales/invoices" element={<Invoices />} />
+                    <Route path="/inventory/products" element={<Products />} />
+                    <Route path="/inventory/transfers" element={<StockTransfers />} />
+                    <Route path="/inventory/adjustments" element={<StockAdjustments />} />
+                    <Route path="/repairs/jobs" element={<JobCards />} />
+                    <Route path="/repairs/board" element={<TechnicianBoard />} />
+                    <Route path="/customers" element={<Customers />} />
+                    <Route path="/reports/sales" element={<SalesReports />} />
+                    <Route path="/suppliers/orders" element={<PurchaseOrders />} />
+                    <Route path="/suppliers/grn" element={<GRN />} />
+                    <Route path="/config/users" element={<UsersRoles />} />
+                  </Route>
                 </Route>
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ConfigProvider>
       </AuthProvider>
     </ThemeProvider>
   </QueryClientProvider>
