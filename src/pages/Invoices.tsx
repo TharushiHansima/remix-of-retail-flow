@@ -10,6 +10,7 @@ import {
   FileText,
   Send,
   Printer,
+  CreditCard,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,10 @@ import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfig } from "@/contexts/ConfigContext";
 import { CreateInvoiceForm } from "@/components/invoices/CreateInvoiceForm";
+import { RecordPaymentModal } from "@/components/invoices/RecordPaymentModal";
+import { PaymentHistory } from "@/components/invoices/PaymentHistory";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 
 interface InvoiceItem {
@@ -102,6 +107,9 @@ export default function Invoices() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
+  const [paymentRefreshTrigger, setPaymentRefreshTrigger] = useState(0);
 
   const fetchInvoices = async () => {
     try {
@@ -157,6 +165,16 @@ export default function Invoices() {
   const handleFormSuccess = () => {
     setShowCreateForm(false);
     fetchInvoices();
+  };
+
+  const handlePaymentSuccess = () => {
+    setPaymentRefreshTrigger((t) => t + 1);
+    fetchInvoices();
+  };
+
+  const openPaymentModal = (invoice: Invoice) => {
+    setPaymentInvoice(invoice);
+    setPaymentModalOpen(true);
   };
 
   if (showCreateForm) {
@@ -339,6 +357,12 @@ export default function Invoices() {
                             <Printer className="mr-2 h-4 w-4" />
                             Print
                           </DropdownMenuItem>
+                          {invoice.status !== "paid" && invoice.status !== "cancelled" && invoice.invoice_type !== "quotation" && (
+                            <DropdownMenuItem onClick={() => openPaymentModal(invoice)}>
+                              <CreditCard className="mr-2 h-4 w-4" />
+                              Record Payment
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem>
                             <Send className="mr-2 h-4 w-4" />
                             Send Email
@@ -458,10 +482,42 @@ export default function Invoices() {
                   <p className="text-sm">{selectedInvoice.notes}</p>
                 </div>
               )}
+
+              {/* Payment History */}
+              {selectedInvoice.invoice_type !== "quotation" && (
+                <div className="pt-4 border-t">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium">Payment History</p>
+                    {selectedInvoice.status !== "paid" && selectedInvoice.status !== "cancelled" && (
+                      <Button size="sm" variant="outline" onClick={() => {
+                        setViewDialogOpen(false);
+                        openPaymentModal(selectedInvoice);
+                      }}>
+                        <CreditCard className="h-4 w-4 mr-2" />
+                        Record Payment
+                      </Button>
+                    )}
+                  </div>
+                  <PaymentHistory invoiceId={selectedInvoice.id} refreshTrigger={paymentRefreshTrigger} />
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Payment Modal */}
+      {paymentInvoice && (
+        <RecordPaymentModal
+          open={paymentModalOpen}
+          onOpenChange={setPaymentModalOpen}
+          invoiceId={paymentInvoice.id}
+          invoiceNumber={paymentInvoice.invoice_number}
+          totalAmount={paymentInvoice.total_amount}
+          paidAmount={paymentInvoice.paid_amount}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   );
 }
