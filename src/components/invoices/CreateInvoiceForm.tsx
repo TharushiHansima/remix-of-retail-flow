@@ -249,12 +249,12 @@ export function CreateInvoiceForm({ onSuccess, onCancel }: CreateInvoiceFormProp
                 </div>
                 <div className="space-y-2">
                   <Label>Customer (Optional)</Label>
-                  <Select value={customerId} onValueChange={setCustomerId}>
+                  <Select value={customerId || "walk-in"} onValueChange={(value) => setCustomerId(value === "walk-in" ? "" : value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Walk-in customer" />
                     </SelectTrigger>
                     <SelectContent className="bg-popover">
-                      <SelectItem value="">Walk-in Customer</SelectItem>
+                      <SelectItem value="walk-in">Walk-in Customer</SelectItem>
                       {customers.map((customer) => (
                         <SelectItem key={customer.id} value={customer.id}>
                           {customer.name}
