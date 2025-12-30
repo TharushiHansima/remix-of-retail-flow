@@ -20,6 +20,8 @@ import InventoryReports from "./pages/InventoryReports";
 import RepairReports from "./pages/RepairReports";
 import FinancialSummary from "./pages/FinancialSummary";
 import PurchaseOrders from "./pages/PurchaseOrders";
+import Suppliers from "./pages/Suppliers";
+import ImportBatches from "./pages/ImportBatches";
 import UsersRoles from "./pages/UsersRoles";
 import Invoices from "./pages/Invoices";
 import GRN from "./pages/GRN";
@@ -63,6 +65,8 @@ const App = () => (
                     <Route path="/reports/repairs" element={<RepairReports />} />
                     <Route path="/reports/financial" element={<FinancialSummary />} />
                     <Route path="/suppliers/orders" element={<PurchaseOrders />} />
+                    <Route path="/suppliers/list" element={<Suppliers />} />
+                    <Route path="/suppliers/batches" element={<ImportBatches />} />
                     <Route path="/suppliers/grn" element={<GRN />} />
                     <Route path="/config/users" element={<UsersRoles />} />
                     <Route path="/config/modules" element={<ModulesConfig />} />
