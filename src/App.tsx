@@ -26,6 +26,7 @@ import ModulesConfig from "./pages/config/ModulesConfig";
 import SystemSettings from "./pages/config/SystemSettings";
 import WorkflowsConfig from "./pages/config/WorkflowsConfig";
 import ApprovalsConfig from "./pages/config/ApprovalsConfig";
+import TaxPricing from "./pages/config/TaxPricing";
 import Approvals from "./pages/Approvals";
 import NotFound from "./pages/NotFound";
 
@@ -61,6 +62,7 @@ const App = () => (
                     <Route path="/config/system" element={<SystemSettings />} />
                     <Route path="/config/workflows" element={<WorkflowsConfig />} />
                     <Route path="/config/approvals" element={<ApprovalsConfig />} />
+                    <Route path="/config/tax" element={<TaxPricing />} />
                     <Route path="/approvals" element={<Approvals />} />
                   </Route>
                 </Route>
