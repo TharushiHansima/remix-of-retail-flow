@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, Save, RotateCcw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -57,6 +58,12 @@ const TaxPricing = () => {
   // Dialog states
   const [taxDialogOpen, setTaxDialogOpen] = useState(false);
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
+  const [editingTaxId, setEditingTaxId] = useState<string | null>(null);
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+
+  // Delete confirmation states
+  const [deleteTaxId, setDeleteTaxId] = useState<string | null>(null);
+  const [deleteRuleId, setDeleteRuleId] = useState<string | null>(null);
 
   // Tax form state
   const [newTaxName, setNewTaxName] = useState("");
@@ -85,7 +92,34 @@ const TaxPricing = () => {
     });
   };
 
-  const handleAddTaxRate = () => {
+  const openTaxDialog = (tax?: TaxRate) => {
+    if (tax) {
+      setEditingTaxId(tax.id);
+      setNewTaxName(tax.name);
+      setNewTaxRate(tax.rate.toString());
+      setNewTaxIsDefault(tax.isDefault);
+      setNewTaxIsActive(tax.isActive);
+    } else {
+      resetTaxForm();
+    }
+    setTaxDialogOpen(true);
+  };
+
+  const openRuleDialog = (rule?: PricingRule) => {
+    if (rule) {
+      setEditingRuleId(rule.id);
+      setNewRuleName(rule.name);
+      setNewRuleType(rule.type);
+      setNewRuleValue(rule.value.toString());
+      setNewRuleAppliesTo(rule.appliesTo);
+      setNewRuleIsActive(rule.isActive);
+    } else {
+      resetRuleForm();
+    }
+    setRuleDialogOpen(true);
+  };
+
+  const handleSaveTaxRate = () => {
     if (!newTaxName.trim() || newTaxRate === "") {
       toast({
         title: "Validation error",
@@ -95,30 +129,52 @@ const TaxPricing = () => {
       return;
     }
 
-    const newTax: TaxRate = {
-      id: crypto.randomUUID(),
+    const taxData = {
       name: newTaxName.trim(),
       rate: parseFloat(newTaxRate),
       isDefault: newTaxIsDefault,
       isActive: newTaxIsActive,
     };
 
-    // If setting as default, remove default from others
-    if (newTaxIsDefault) {
-      setTaxRates(prev => prev.map(t => ({ ...t, isDefault: false })));
+    if (editingTaxId) {
+      // Update existing
+      setTaxRates(prev => prev.map(t => {
+        if (t.id === editingTaxId) {
+          return { ...t, ...taxData };
+        }
+        // Remove default from others if this one is set as default
+        if (newTaxIsDefault && t.id !== editingTaxId) {
+          return { ...t, isDefault: false };
+        }
+        return t;
+      }));
+      toast({
+        title: "Tax rate updated",
+        description: `${taxData.name} has been updated successfully.`,
+      });
+    } else {
+      // Create new
+      const newTax: TaxRate = {
+        id: crypto.randomUUID(),
+        ...taxData,
+      };
+
+      if (newTaxIsDefault) {
+        setTaxRates(prev => [...prev.map(t => ({ ...t, isDefault: false })), newTax]);
+      } else {
+        setTaxRates(prev => [...prev, newTax]);
+      }
+      toast({
+        title: "Tax rate added",
+        description: `${newTax.name} has been added successfully.`,
+      });
     }
 
-    setTaxRates(prev => [...prev, newTax]);
     setTaxDialogOpen(false);
     resetTaxForm();
-    
-    toast({
-      title: "Tax rate added",
-      description: `${newTax.name} has been added successfully.`,
-    });
   };
 
-  const handleAddPricingRule = () => {
+  const handleSavePricingRule = () => {
     if (!newRuleName.trim() || newRuleValue === "") {
       toast({
         title: "Validation error",
@@ -128,8 +184,7 @@ const TaxPricing = () => {
       return;
     }
 
-    const newRule: PricingRule = {
-      id: crypto.randomUUID(),
+    const ruleData = {
       name: newRuleName.trim(),
       type: newRuleType,
       value: parseFloat(newRuleValue),
@@ -137,17 +192,34 @@ const TaxPricing = () => {
       isActive: newRuleIsActive,
     };
 
-    setPricingRules(prev => [...prev, newRule]);
+    if (editingRuleId) {
+      // Update existing
+      setPricingRules(prev => prev.map(r => 
+        r.id === editingRuleId ? { ...r, ...ruleData } : r
+      ));
+      toast({
+        title: "Pricing rule updated",
+        description: `${ruleData.name} has been updated successfully.`,
+      });
+    } else {
+      // Create new
+      const newRule: PricingRule = {
+        id: crypto.randomUUID(),
+        ...ruleData,
+      };
+      setPricingRules(prev => [...prev, newRule]);
+      toast({
+        title: "Pricing rule added",
+        description: `${newRule.name} has been added successfully.`,
+      });
+    }
+
     setRuleDialogOpen(false);
     resetRuleForm();
-    
-    toast({
-      title: "Pricing rule added",
-      description: `${newRule.name} has been added successfully.`,
-    });
   };
 
   const resetTaxForm = () => {
+    setEditingTaxId(null);
     setNewTaxName("");
     setNewTaxRate("");
     setNewTaxIsDefault(false);
@@ -155,6 +227,7 @@ const TaxPricing = () => {
   };
 
   const resetRuleForm = () => {
+    setEditingRuleId(null);
     setNewRuleName("");
     setNewRuleType("markup");
     setNewRuleValue("");
@@ -162,20 +235,26 @@ const TaxPricing = () => {
     setNewRuleIsActive(true);
   };
 
-  const handleDeleteTaxRate = (id: string) => {
-    setTaxRates(prev => prev.filter(t => t.id !== id));
-    toast({
-      title: "Tax rate deleted",
-      description: "The tax rate has been removed.",
-    });
+  const confirmDeleteTaxRate = () => {
+    if (deleteTaxId) {
+      setTaxRates(prev => prev.filter(t => t.id !== deleteTaxId));
+      toast({
+        title: "Tax rate deleted",
+        description: "The tax rate has been removed.",
+      });
+      setDeleteTaxId(null);
+    }
   };
 
-  const handleDeletePricingRule = (id: string) => {
-    setPricingRules(prev => prev.filter(r => r.id !== id));
-    toast({
-      title: "Pricing rule deleted",
-      description: "The pricing rule has been removed.",
-    });
+  const confirmDeletePricingRule = () => {
+    if (deleteRuleId) {
+      setPricingRules(prev => prev.filter(r => r.id !== deleteRuleId));
+      toast({
+        title: "Pricing rule deleted",
+        description: "The pricing rule has been removed.",
+      });
+      setDeleteRuleId(null);
+    }
   };
 
   return (
@@ -294,7 +373,7 @@ const TaxPricing = () => {
             <CardTitle>Tax Rates</CardTitle>
             <CardDescription>Manage available tax rates</CardDescription>
           </div>
-          <Button size="sm" onClick={() => setTaxDialogOpen(true)}>
+          <Button size="sm" onClick={() => openTaxDialog()}>
             <Plus className="mr-2 h-4 w-4" />
             Add Tax Rate
           </Button>
@@ -326,10 +405,10 @@ const TaxPricing = () => {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" onClick={() => openTaxDialog(tax)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteTaxRate(tax.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => setDeleteTaxId(tax.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -347,7 +426,7 @@ const TaxPricing = () => {
             <CardTitle>Pricing Rules</CardTitle>
             <CardDescription>Configure markup and margin rules</CardDescription>
           </div>
-          <Button size="sm" onClick={() => setRuleDialogOpen(true)}>
+          <Button size="sm" onClick={() => openRuleDialog()}>
             <Plus className="mr-2 h-4 w-4" />
             Add Rule
           </Button>
@@ -369,7 +448,7 @@ const TaxPricing = () => {
                 <TableRow key={rule.id}>
                   <TableCell className="font-medium">{rule.name}</TableCell>
                   <TableCell className="capitalize">{rule.type}</TableCell>
-                  <TableCell>{rule.value}%</TableCell>
+                  <TableCell>{rule.type === 'fixed' ? `$${rule.value}` : `${rule.value}%`}</TableCell>
                   <TableCell className="capitalize">{rule.appliesTo}</TableCell>
                   <TableCell>
                     <Badge variant={rule.isActive ? "default" : "secondary"}>
@@ -377,10 +456,10 @@ const TaxPricing = () => {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" onClick={() => openRuleDialog(rule)}>
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeletePricingRule(rule.id)}>
+                    <Button variant="ghost" size="icon" onClick={() => setDeleteRuleId(rule.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -391,12 +470,14 @@ const TaxPricing = () => {
         </CardContent>
       </Card>
 
-      {/* Add Tax Rate Dialog */}
-      <Dialog open={taxDialogOpen} onOpenChange={setTaxDialogOpen}>
+      {/* Add/Edit Tax Rate Dialog */}
+      <Dialog open={taxDialogOpen} onOpenChange={(open) => { setTaxDialogOpen(open); if (!open) resetTaxForm(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Tax Rate</DialogTitle>
-            <DialogDescription>Create a new tax rate for your products and services.</DialogDescription>
+            <DialogTitle>{editingTaxId ? "Edit Tax Rate" : "Add Tax Rate"}</DialogTitle>
+            <DialogDescription>
+              {editingTaxId ? "Update the tax rate details." : "Create a new tax rate for your products and services."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -440,17 +521,21 @@ const TaxPricing = () => {
             <Button variant="outline" onClick={() => { setTaxDialogOpen(false); resetTaxForm(); }}>
               Cancel
             </Button>
-            <Button onClick={handleAddTaxRate}>Add Tax Rate</Button>
+            <Button onClick={handleSaveTaxRate}>
+              {editingTaxId ? "Save Changes" : "Add Tax Rate"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Add Pricing Rule Dialog */}
-      <Dialog open={ruleDialogOpen} onOpenChange={setRuleDialogOpen}>
+      {/* Add/Edit Pricing Rule Dialog */}
+      <Dialog open={ruleDialogOpen} onOpenChange={(open) => { setRuleDialogOpen(open); if (!open) resetRuleForm(); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Pricing Rule</DialogTitle>
-            <DialogDescription>Create a new pricing rule for markup or margin calculations.</DialogDescription>
+            <DialogTitle>{editingRuleId ? "Edit Pricing Rule" : "Add Pricing Rule"}</DialogTitle>
+            <DialogDescription>
+              {editingRuleId ? "Update the pricing rule details." : "Create a new pricing rule for markup or margin calculations."}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -512,10 +597,44 @@ const TaxPricing = () => {
             <Button variant="outline" onClick={() => { setRuleDialogOpen(false); resetRuleForm(); }}>
               Cancel
             </Button>
-            <Button onClick={handleAddPricingRule}>Add Rule</Button>
+            <Button onClick={handleSavePricingRule}>
+              {editingRuleId ? "Save Changes" : "Add Rule"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Tax Rate Confirmation */}
+      <AlertDialog open={!!deleteTaxId} onOpenChange={(open) => !open && setDeleteTaxId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Tax Rate</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this tax rate? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteTaxRate}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Pricing Rule Confirmation */}
+      <AlertDialog open={!!deleteRuleId} onOpenChange={(open) => !open && setDeleteRuleId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Pricing Rule</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this pricing rule? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeletePricingRule}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
