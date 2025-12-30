@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Check, X, Clock, FileText, Package, ShoppingCart, Receipt, RefreshCw } from "lucide-react";
+import { Check, X, Clock, FileText, Package, ShoppingCart, Receipt, RefreshCw, UserPlus } from "lucide-react";
 import { useApprovals, Approval } from "@/hooks/useApprovals";
 import { useConfig } from "@/contexts/ConfigContext";
 import { formatDistanceToNow } from "date-fns";
@@ -18,6 +18,7 @@ const entityIcons: Record<string, React.ReactNode> = {
   stock_adjustment: <Package className="h-4 w-4" />,
   invoice: <Receipt className="h-4 w-4" />,
   discount: <FileText className="h-4 w-4" />,
+  user: <UserPlus className="h-4 w-4" />,
 };
 
 const entityLabels: Record<string, string> = {
@@ -25,6 +26,7 @@ const entityLabels: Record<string, string> = {
   stock_adjustment: "Stock Adjustment",
   invoice: "Invoice",
   discount: "Discount Override",
+  user: "New User Signup",
 };
 
 export function PendingApprovalsDashboard() {
@@ -60,6 +62,12 @@ export function PendingApprovalsDashboard() {
 
     return (
       <div className="text-xs text-muted-foreground mt-1">
+        {metadata.email !== undefined && (
+          <span className="mr-3">Email: {String(metadata.email)}</span>
+        )}
+        {metadata.full_name !== undefined && metadata.full_name && (
+          <span className="mr-3">Name: {String(metadata.full_name)}</span>
+        )}
         {metadata.amount !== undefined && (
           <span className="mr-3">Amount: {formatCurrency(Number(metadata.amount))}</span>
         )}
