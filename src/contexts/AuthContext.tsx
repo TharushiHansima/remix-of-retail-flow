@@ -9,6 +9,7 @@ interface Profile {
   email: string;
   full_name: string | null;
   avatar_url: string | null;
+  approval_status: "pending" | "approved" | "rejected";
 }
 
 interface UserRole {
@@ -21,6 +22,8 @@ interface AuthContextType {
   profile: Profile | null;
   roles: UserRole[];
   isLoading: boolean;
+  isApproved: boolean;
+  isPendingApproval: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -131,6 +134,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return roles.some((r) => r.role === role);
   };
 
+  const isApproved = profile?.approval_status === "approved";
+  const isPendingApproval = profile?.approval_status === "pending";
+
   return (
     <AuthContext.Provider
       value={{
@@ -139,6 +145,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         roles,
         isLoading,
+        isApproved,
+        isPendingApproval,
         signIn,
         signUp,
         signOut,
