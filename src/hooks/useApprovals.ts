@@ -70,6 +70,9 @@ export function useApprovals() {
 
   const approveRequest = async (id: string, comment?: string) => {
     try {
+      // Find the approval to check entity type
+      const approval = approvals.find(a => a.id === id);
+      
       const { error } = await supabase
         .from("approvals")
         .update({
@@ -81,6 +84,23 @@ export function useApprovals() {
         .eq("id", id);
 
       if (error) throw error;
+
+      // If this is a user signup approval, update the profile
+      if (approval?.entity_type === "user") {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            approval_status: "approved",
+            approved_at: new Date().toISOString(),
+            approved_by: user?.id,
+          })
+          .eq("id", approval.entity_id);
+        
+        if (profileError) {
+          console.error("Error updating profile:", profileError);
+        }
+      }
+
       toast.success("Request approved");
       fetchApprovals();
     } catch (error) {
@@ -91,6 +111,9 @@ export function useApprovals() {
 
   const rejectRequest = async (id: string, comment?: string) => {
     try {
+      // Find the approval to check entity type
+      const approval = approvals.find(a => a.id === id);
+      
       const { error } = await supabase
         .from("approvals")
         .update({
@@ -102,6 +125,21 @@ export function useApprovals() {
         .eq("id", id);
 
       if (error) throw error;
+
+      // If this is a user signup approval, update the profile
+      if (approval?.entity_type === "user") {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            approval_status: "rejected",
+          })
+          .eq("id", approval.entity_id);
+        
+        if (profileError) {
+          console.error("Error updating profile:", profileError);
+        }
+      }
+
       toast.success("Request rejected");
       fetchApprovals();
     } catch (error) {
