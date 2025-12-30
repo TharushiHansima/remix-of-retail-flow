@@ -16,6 +16,9 @@ import JobCards from "./pages/JobCards";
 import TechnicianBoard from "./pages/TechnicianBoard";
 import Customers from "./pages/Customers";
 import SalesReports from "./pages/SalesReports";
+import InventoryReports from "./pages/InventoryReports";
+import RepairReports from "./pages/RepairReports";
+import FinancialSummary from "./pages/FinancialSummary";
 import PurchaseOrders from "./pages/PurchaseOrders";
 import UsersRoles from "./pages/UsersRoles";
 import Invoices from "./pages/Invoices";
@@ -56,6 +59,9 @@ const App = () => (
                     <Route path="/repairs/board" element={<TechnicianBoard />} />
                     <Route path="/customers" element={<Customers />} />
                     <Route path="/reports/sales" element={<SalesReports />} />
+                    <Route path="/reports/inventory" element={<InventoryReports />} />
+                    <Route path="/reports/repairs" element={<RepairReports />} />
+                    <Route path="/reports/financial" element={<FinancialSummary />} />
                     <Route path="/suppliers/orders" element={<PurchaseOrders />} />
                     <Route path="/suppliers/grn" element={<GRN />} />
                     <Route path="/config/users" element={<UsersRoles />} />
