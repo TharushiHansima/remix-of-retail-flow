@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ConfigProvider } from "@/contexts/ConfigContext";
@@ -64,6 +64,7 @@ const App = () => (
                     <Route path="/reports/inventory" element={<InventoryReports />} />
                     <Route path="/reports/repairs" element={<RepairReports />} />
                     <Route path="/reports/financial" element={<FinancialSummary />} />
+                    <Route path="/suppliers" element={<Navigate to="/suppliers/list" replace />} />
                     <Route path="/suppliers/orders" element={<PurchaseOrders />} />
                     <Route path="/suppliers/list" element={<Suppliers />} />
                     <Route path="/suppliers/batches" element={<ImportBatches />} />
