@@ -19,7 +19,18 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -64,6 +75,8 @@ export default function CategoriesBrands() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryParent, setNewCategoryParent] = useState<string>('none');
   const [newBrandName, setNewBrandName] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingItem, setDeletingItem] = useState<{ type: 'category' | 'brand'; id: string; name: string } | null>(null);
 
   const parentCategories = categories.filter(c => !c.parentId);
 
@@ -71,6 +84,24 @@ export default function CategoriesBrands() {
     if (!category.parentId) return category.name;
     const parent = categories.find(c => c.id === category.parentId);
     return parent ? `${parent.name} → ${category.name}` : category.name;
+  };
+
+  const openDeleteDialog = (type: 'category' | 'brand', id: string, name: string) => {
+    setDeletingItem({ type, id, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingItem) return;
+    if (deletingItem.type === 'category') {
+      setCategories(categories.filter(c => c.id !== deletingItem.id && c.parentId !== deletingItem.id));
+      toast.success('Category deleted successfully');
+    } else {
+      setBrands(brands.filter(b => b.id !== deletingItem.id));
+      toast.success('Brand deleted successfully');
+    }
+    setDeleteDialogOpen(false);
+    setDeletingItem(null);
   };
 
   const handleAddCategory = () => {
@@ -102,11 +133,6 @@ export default function CategoriesBrands() {
     toast.success('Category updated successfully');
   };
 
-  const handleDeleteCategory = (id: string) => {
-    setCategories(categories.filter(c => c.id !== id && c.parentId !== id));
-    toast.success('Category deleted successfully');
-  };
-
   const handleAddBrand = () => {
     if (!newBrandName.trim()) return;
     const newBrand = {
@@ -129,11 +155,6 @@ export default function CategoriesBrands() {
     setNewBrandName('');
     setBrandDialogOpen(false);
     toast.success('Brand updated successfully');
-  };
-
-  const handleDeleteBrand = (id: string) => {
-    setBrands(brands.filter(b => b.id !== id));
-    toast.success('Brand deleted successfully');
   };
 
   const openEditCategory = (category: typeof mockCategories[0]) => {
@@ -253,7 +274,7 @@ export default function CategoriesBrands() {
                         <Button variant="ghost" size="icon" onClick={() => openEditCategory(category)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteCategory(category.id)}>
+                        <Button variant="ghost" size="icon" onClick={() => openDeleteDialog('category', category.id, category.name)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </TableCell>
@@ -291,7 +312,7 @@ export default function CategoriesBrands() {
                         <Button variant="ghost" size="icon" onClick={() => openEditBrand(brand)}>
                           <Edit className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteBrand(brand.id)}>
+                        <Button variant="ghost" size="icon" onClick={() => openDeleteDialog('brand', brand.id, brand.name)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </TableCell>
@@ -367,6 +388,26 @@ export default function CategoriesBrands() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deletingItem?.type === 'category' ? 'Category' : 'Brand'}</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{deletingItem?.name}"? 
+              {deletingItem?.type === 'category' && ' This will also delete all subcategories.'}
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
