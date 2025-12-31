@@ -14,6 +14,9 @@ import POS from "./pages/POS";
 import Products from "./pages/Products";
 import JobCards from "./pages/JobCards";
 import TechnicianBoard from "./pages/TechnicianBoard";
+import Estimates from "./pages/Estimates";
+import ServiceBilling from "./pages/ServiceBilling";
+import WarrantyJobs from "./pages/WarrantyJobs";
 import Customers from "./pages/Customers";
 import SalesReports from "./pages/SalesReports";
 import InventoryReports from "./pages/InventoryReports";
@@ -62,6 +65,9 @@ const App = () => (
                     <Route path="/inventory/adjustments" element={<StockAdjustments />} />
                     <Route path="/repairs/jobs" element={<JobCards />} />
                     <Route path="/repairs/board" element={<TechnicianBoard />} />
+                    <Route path="/repairs/estimates" element={<Estimates />} />
+                    <Route path="/repairs/billing" element={<ServiceBilling />} />
+                    <Route path="/repairs/warranty" element={<WarrantyJobs />} />
                     <Route path="/customers" element={<Customers />} />
                     <Route path="/customers/credit" element={<CreditAccounts />} />
                     <Route path="/customers/receivables" element={<ReceivablesAging />} />
