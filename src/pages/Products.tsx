@@ -36,6 +36,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AddProductDialog } from "@/components/products/AddProductDialog";
+import { ViewProductDialog } from "@/components/products/ViewProductDialog";
+import { EditProductDialog } from "@/components/products/EditProductDialog";
+import { DeleteProductDialog } from "@/components/products/DeleteProductDialog";
 
 interface Product {
   id: string;
@@ -144,6 +148,11 @@ const statusColors = {
 export default function Products() {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const toggleSelect = (id: string) => {
     setSelectedProducts((prev) =>
@@ -163,6 +172,21 @@ export default function Products() {
       p.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleView = (product: Product) => {
+    setSelectedProduct(product);
+    setViewDialogOpen(true);
+  };
+
+  const handleEdit = (product: Product) => {
+    setSelectedProduct(product);
+    setEditDialogOpen(true);
+  };
+
+  const handleDelete = (product: Product) => {
+    setSelectedProduct(product);
+    setDeleteDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -180,7 +204,7 @@ export default function Products() {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button size="sm">
+          <Button size="sm" onClick={() => setAddDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Add Product
           </Button>
@@ -320,15 +344,18 @@ export default function Products() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-popover">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleView(product)}>
                         <Eye className="mr-2 h-4 w-4" />
                         View Details
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEdit(product)}>
                         <Edit className="mr-2 h-4 w-4" />
                         Edit Product
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem 
+                        className="text-destructive"
+                        onClick={() => handleDelete(product)}
+                      >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Delete
                       </DropdownMenuItem>
@@ -358,6 +385,24 @@ export default function Products() {
           </Button>
         </div>
       </div>
+
+      {/* Dialogs */}
+      <AddProductDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
+      <ViewProductDialog 
+        open={viewDialogOpen} 
+        onOpenChange={setViewDialogOpen} 
+        product={selectedProduct} 
+      />
+      <EditProductDialog 
+        open={editDialogOpen} 
+        onOpenChange={setEditDialogOpen} 
+        product={selectedProduct} 
+      />
+      <DeleteProductDialog 
+        open={deleteDialogOpen} 
+        onOpenChange={setDeleteDialogOpen} 
+        product={selectedProduct} 
+      />
     </div>
   );
 }
