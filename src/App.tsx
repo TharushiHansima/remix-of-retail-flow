@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { ConfigProvider } from "@/contexts/ConfigContext";
@@ -16,7 +16,12 @@ import JobCards from "./pages/JobCards";
 import TechnicianBoard from "./pages/TechnicianBoard";
 import Customers from "./pages/Customers";
 import SalesReports from "./pages/SalesReports";
+import InventoryReports from "./pages/InventoryReports";
+import RepairReports from "./pages/RepairReports";
+import FinancialSummary from "./pages/FinancialSummary";
 import PurchaseOrders from "./pages/PurchaseOrders";
+import Suppliers from "./pages/Suppliers";
+import ImportBatches from "./pages/ImportBatches";
 import UsersRoles from "./pages/UsersRoles";
 import Invoices from "./pages/Invoices";
 import GRN from "./pages/GRN";
@@ -56,7 +61,13 @@ const App = () => (
                     <Route path="/repairs/board" element={<TechnicianBoard />} />
                     <Route path="/customers" element={<Customers />} />
                     <Route path="/reports/sales" element={<SalesReports />} />
+                    <Route path="/reports/inventory" element={<InventoryReports />} />
+                    <Route path="/reports/repairs" element={<RepairReports />} />
+                    <Route path="/reports/financial" element={<FinancialSummary />} />
+                    <Route path="/suppliers" element={<Navigate to="/suppliers/list" replace />} />
                     <Route path="/suppliers/orders" element={<PurchaseOrders />} />
+                    <Route path="/suppliers/list" element={<Suppliers />} />
+                    <Route path="/suppliers/batches" element={<ImportBatches />} />
                     <Route path="/suppliers/grn" element={<GRN />} />
                     <Route path="/config/users" element={<UsersRoles />} />
                     <Route path="/config/modules" element={<ModulesConfig />} />
