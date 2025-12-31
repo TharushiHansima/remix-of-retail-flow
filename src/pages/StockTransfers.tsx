@@ -11,6 +11,8 @@ import {
   Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CreateTransferDialog } from "@/components/stock-transfers/CreateTransferDialog";
+import { ViewTransferDialog } from "@/components/stock-transfers/ViewTransferDialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -104,6 +106,14 @@ const statusLabels: Record<string, string> = {
 export default function StockTransfers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
+
+  const handleViewDetails = (transfer: Transfer) => {
+    setSelectedTransfer(transfer);
+    setViewDialogOpen(true);
+  };
 
   const filteredTransfers = transfers.filter((t) => {
     const matchesSearch =
@@ -125,7 +135,7 @@ export default function StockTransfers() {
           <h1 className="text-2xl font-bold text-foreground">Stock Transfers</h1>
           <p className="text-muted-foreground">Transfer inventory between branches</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Transfer
         </Button>
@@ -242,7 +252,7 @@ export default function StockTransfers() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-popover">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleViewDetails(transfer)}>
                         <Eye className="mr-2 h-4 w-4" />
                         View Details
                       </DropdownMenuItem>
@@ -266,6 +276,9 @@ export default function StockTransfers() {
           </TableBody>
         </Table>
       </div>
+
+      <CreateTransferDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      <ViewTransferDialog open={viewDialogOpen} onOpenChange={setViewDialogOpen} transfer={selectedTransfer} />
     </div>
   );
 }

@@ -13,6 +13,8 @@ import {
   Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CreateAdjustmentDialog } from "@/components/stock-adjustments/CreateAdjustmentDialog";
+import { ViewAdjustmentDialog } from "@/components/stock-adjustments/ViewAdjustmentDialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -135,6 +137,14 @@ export default function StockAdjustments() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedAdjustment, setSelectedAdjustment] = useState<Adjustment | null>(null);
+
+  const handleViewDetails = (adjustment: Adjustment) => {
+    setSelectedAdjustment(adjustment);
+    setViewDialogOpen(true);
+  };
 
   const filteredAdjustments = adjustments.filter((adj) => {
     const matchesSearch =
@@ -161,7 +171,7 @@ export default function StockAdjustments() {
           <h1 className="text-2xl font-bold text-foreground">Stock Adjustments</h1>
           <p className="text-muted-foreground">Manage inventory adjustments with approval workflow</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Adjustment
         </Button>
@@ -298,7 +308,7 @@ export default function StockAdjustments() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-popover">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewDetails(adj)}>
                           <Eye className="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
@@ -323,6 +333,9 @@ export default function StockAdjustments() {
           </TableBody>
         </Table>
       </div>
+
+      <CreateAdjustmentDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      <ViewAdjustmentDialog open={viewDialogOpen} onOpenChange={setViewDialogOpen} adjustment={selectedAdjustment} />
     </div>
   );
 }
