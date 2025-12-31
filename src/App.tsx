@@ -27,6 +27,9 @@ import Invoices from "./pages/Invoices";
 import GRN from "./pages/GRN";
 import StockTransfers from "./pages/StockTransfers";
 import StockAdjustments from "./pages/StockAdjustments";
+import CreditAccounts from "./pages/CreditAccounts";
+import ReceivablesAging from "./pages/ReceivablesAging";
+import ServiceHistory from "./pages/ServiceHistory";
 import ModulesConfig from "./pages/config/ModulesConfig";
 import SystemSettings from "./pages/config/SystemSettings";
 import WorkflowsConfig from "./pages/config/WorkflowsConfig";
@@ -60,6 +63,9 @@ const App = () => (
                     <Route path="/repairs/jobs" element={<JobCards />} />
                     <Route path="/repairs/board" element={<TechnicianBoard />} />
                     <Route path="/customers" element={<Customers />} />
+                    <Route path="/customers/credit" element={<CreditAccounts />} />
+                    <Route path="/customers/receivables" element={<ReceivablesAging />} />
+                    <Route path="/customers/service-history" element={<ServiceHistory />} />
                     <Route path="/reports/sales" element={<SalesReports />} />
                     <Route path="/reports/inventory" element={<InventoryReports />} />
                     <Route path="/reports/repairs" element={<RepairReports />} />
