@@ -15,6 +15,7 @@ import {
   Smartphone,
   Calendar,
 } from "lucide-react";
+import { CreateWarrantyJobDialog } from "@/components/warranty/CreateWarrantyJobDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -161,6 +162,7 @@ const warrantyTypeConfig = {
 export default function WarrantyJobs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const filteredJobs = warrantyJobs.filter(
     (job) =>
@@ -187,7 +189,7 @@ export default function WarrantyJobs() {
           <h1 className="text-2xl font-bold text-foreground">Warranty Jobs</h1>
           <p className="text-muted-foreground">Manage warranty repairs and claims</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
           <Shield className="h-4 w-4 mr-2" />
           New Warranty Job
         </Button>
@@ -382,6 +384,8 @@ export default function WarrantyJobs() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <CreateWarrantyJobDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
     </div>
   );
 }

@@ -16,6 +16,7 @@ import {
   Smartphone,
   FileText,
 } from "lucide-react";
+import { CreateBillDialog } from "@/components/service-billing/CreateBillDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -154,6 +155,7 @@ const statusConfig = {
 export default function ServiceBilling() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const filteredBills = serviceBills.filter(
     (bill) =>
@@ -184,7 +186,7 @@ export default function ServiceBilling() {
           <h1 className="text-2xl font-bold text-foreground">Service Billing</h1>
           <p className="text-muted-foreground">Manage billing for repair and service jobs</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Bill
         </Button>
@@ -369,6 +371,8 @@ export default function ServiceBilling() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <CreateBillDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
     </div>
   );
 }
