@@ -12,6 +12,9 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import POS from "./pages/POS";
 import Products from "./pages/Products";
+import CategoriesBrands from "./pages/CategoriesBrands";
+import StockOverview from "./pages/StockOverview";
+import SerialRegistry from "./pages/SerialRegistry";
 import JobCards from "./pages/JobCards";
 import TechnicianBoard from "./pages/TechnicianBoard";
 import Estimates from "./pages/Estimates";
@@ -27,6 +30,9 @@ import Suppliers from "./pages/Suppliers";
 import ImportBatches from "./pages/ImportBatches";
 import UsersRoles from "./pages/UsersRoles";
 import Invoices from "./pages/Invoices";
+import Quotations from "./pages/Quotations";
+import ReturnsRefunds from "./pages/ReturnsRefunds";
+import Payments from "./pages/Payments";
 import GRN from "./pages/GRN";
 import StockTransfers from "./pages/StockTransfers";
 import StockAdjustments from "./pages/StockAdjustments";
@@ -40,6 +46,9 @@ import ApprovalsConfig from "./pages/config/ApprovalsConfig";
 import TaxPricing from "./pages/config/TaxPricing";
 import BranchSetup from "./pages/config/BranchSetup";
 import Approvals from "./pages/Approvals";
+import Profile from "./pages/Profile";
+import ChangePassword from "./pages/ChangePassword";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,7 +69,13 @@ const App = () => (
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/pos" element={<POS />} />
                     <Route path="/sales/invoices" element={<Invoices />} />
+                    <Route path="/sales/quotations" element={<Quotations />} />
+                    <Route path="/sales/returns" element={<ReturnsRefunds />} />
+                    <Route path="/sales/payments" element={<Payments />} />
                     <Route path="/inventory/products" element={<Products />} />
+                    <Route path="/inventory/categories" element={<CategoriesBrands />} />
+                    <Route path="/inventory/stock" element={<StockOverview />} />
+                    <Route path="/inventory/serials" element={<SerialRegistry />} />
                     <Route path="/inventory/transfers" element={<StockTransfers />} />
                     <Route path="/inventory/adjustments" element={<StockAdjustments />} />
                     <Route path="/repairs/jobs" element={<JobCards />} />
@@ -89,6 +104,9 @@ const App = () => (
                     <Route path="/config/tax" element={<TaxPricing />} />
                     <Route path="/config/branches" element={<BranchSetup />} />
                     <Route path="/approvals" element={<Approvals />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/change-password" element={<ChangePassword />} />
+                    <Route path="/settings" element={<Settings />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<NotFound />} />
