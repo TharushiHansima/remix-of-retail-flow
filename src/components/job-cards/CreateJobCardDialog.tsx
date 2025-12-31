@@ -248,7 +248,7 @@ export function CreateJobCardDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent className="bg-popover">
-                          <SelectItem value="">Unassigned</SelectItem>
+                          <SelectItem value="unassigned">Unassigned</SelectItem>
                           {technicians.map((tech) => (
                             <SelectItem key={tech.id} value={tech.name}>
                               {tech.name}
