@@ -30,6 +30,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { AddCustomerDialog } from "@/components/customers/AddCustomerDialog";
+import { ViewCustomerDialog } from "@/components/customers/ViewCustomerDialog";
+import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
+import { CustomerInvoicesDialog } from "@/components/customers/CustomerInvoicesDialog";
 
 interface Customer {
   id: string;
@@ -115,6 +119,11 @@ const customers: Customer[] = [
 
 export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isInvoicesDialogOpen, setIsInvoicesDialogOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   const filteredCustomers = customers.filter(
     (c) =>
@@ -122,6 +131,21 @@ export default function Customers() {
       c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       c.phone.includes(searchQuery)
   );
+
+  const handleViewProfile = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleEditCustomer = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleViewInvoices = (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setIsInvoicesDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -131,11 +155,32 @@ export default function Customers() {
           <h1 className="text-2xl font-bold text-foreground">Customers</h1>
           <p className="text-muted-foreground">Manage your customer database</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Customer
         </Button>
       </div>
+
+      {/* Dialogs */}
+      <AddCustomerDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+      />
+      <ViewCustomerDialog
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
+        customer={selectedCustomer}
+      />
+      <EditCustomerDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        customer={selectedCustomer}
+      />
+      <CustomerInvoicesDialog
+        open={isInvoicesDialogOpen}
+        onOpenChange={setIsInvoicesDialogOpen}
+        customer={selectedCustomer}
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -267,15 +312,15 @@ export default function Customers() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-popover">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleViewProfile(customer)}>
                         <Eye className="mr-2 h-4 w-4" />
                         View Profile
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditCustomer(customer)}>
                         <Edit className="mr-2 h-4 w-4" />
                         Edit Customer
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleViewInvoices(customer)}>
                         <FileText className="mr-2 h-4 w-4" />
                         View Invoices
                       </DropdownMenuItem>

@@ -46,6 +46,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
+import { CreateGRNDialog } from "@/components/grn/CreateGRNDialog";
 
 interface GRNItem {
   id: string;
@@ -157,6 +158,7 @@ export default function GRN() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGRN, setSelectedGRN] = useState<GRN | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const filteredGRNs = grns.filter((grn) => {
     const matchesSearch =
@@ -183,12 +185,17 @@ export default function GRN() {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button size="sm">
+          <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" />
             New GRN
           </Button>
         </div>
       </div>
+
+      <CreateGRNDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

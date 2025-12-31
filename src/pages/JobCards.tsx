@@ -33,6 +33,10 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { CreateJobCardDialog } from "@/components/job-cards/CreateJobCardDialog";
+import { ViewJobCardDialog } from "@/components/job-cards/ViewJobCardDialog";
+import { EditJobCardDialog } from "@/components/job-cards/EditJobCardDialog";
+import { CreateJobInvoiceDialog } from "@/components/job-cards/CreateJobInvoiceDialog";
 
 interface JobCard {
   id: string;
@@ -168,6 +172,11 @@ const priorityColors = {
 export default function JobCards() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<JobCard | null>(null);
 
   const filteredJobs = jobCards.filter(
     (job) =>
@@ -180,6 +189,21 @@ export default function JobCards() {
   const getStatusCount = (status: string) =>
     jobCards.filter((job) => job.status === status).length;
 
+  const handleViewDetails = (job: JobCard) => {
+    setSelectedJob(job);
+    setViewDialogOpen(true);
+  };
+
+  const handleEditJob = (job: JobCard) => {
+    setSelectedJob(job);
+    setEditDialogOpen(true);
+  };
+
+  const handleCreateInvoice = (job: JobCard) => {
+    setSelectedJob(job);
+    setInvoiceDialogOpen(true);
+  };
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -188,11 +212,31 @@ export default function JobCards() {
           <h1 className="text-2xl font-bold text-foreground">Job Cards</h1>
           <p className="text-muted-foreground">Manage repair and service jobs</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Job Card
         </Button>
       </div>
+
+      <CreateJobCardDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
+      <ViewJobCardDialog
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+        job={selectedJob}
+      />
+      <EditJobCardDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        job={selectedJob}
+      />
+      <CreateJobInvoiceDialog
+        open={invoiceDialogOpen}
+        onOpenChange={setInvoiceDialogOpen}
+        job={selectedJob}
+      />
 
       {/* Status Tabs */}
       <Tabs defaultValue="all" className="space-y-4">
@@ -277,15 +321,15 @@ export default function JobCards() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-popover">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewDetails(job)}>
                           <Eye className="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditJob(job)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Job
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleCreateInvoice(job)}>
                           <FileText className="mr-2 h-4 w-4" />
                           Create Invoice
                         </DropdownMenuItem>

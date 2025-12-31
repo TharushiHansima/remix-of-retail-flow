@@ -291,10 +291,10 @@ export const navigationConfig: NavItem[] = [
     icon: 'Truck',
     moduleId: 'suppliers',
     children: [
-      { id: 'list', title: 'Supplier List', href: '/suppliers' },
+      { id: 'list', title: 'Supplier List', href: '/suppliers/list' },
       { id: 'orders', title: 'Purchase Orders', href: '/suppliers/orders' },
       { id: 'grn', title: 'GRN', href: '/suppliers/grn' },
-      { id: 'imports', title: 'Import Batches', href: '/suppliers/imports', featureId: 'landed_costs' },
+      { id: 'batches', title: 'Import Batches', href: '/suppliers/batches', featureId: 'landed_costs' },
     ],
   },
   {

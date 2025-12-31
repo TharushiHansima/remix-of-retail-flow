@@ -29,6 +29,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CreatePurchaseOrderDialog } from "@/components/purchase-orders/CreatePurchaseOrderDialog";
+import { ViewPurchaseOrderDialog } from "@/components/purchase-orders/ViewPurchaseOrderDialog";
+import { EditPurchaseOrderDialog } from "@/components/purchase-orders/EditPurchaseOrderDialog";
+import { CreateGRNDialog } from "@/components/purchase-orders/CreateGRNDialog";
 
 interface PurchaseOrder {
   id: string;
@@ -105,12 +109,32 @@ const statusConfig = {
 
 export default function PurchaseOrders() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isGRNDialogOpen, setIsGRNDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
 
   const filteredOrders = orders.filter(
     (o) =>
       o.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.supplier.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleViewDetails = (order: PurchaseOrder) => {
+    setSelectedOrder(order);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleEditOrder = (order: PurchaseOrder) => {
+    setSelectedOrder(order);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleCreateGRN = (order: PurchaseOrder) => {
+    setSelectedOrder(order);
+    setIsGRNDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -120,11 +144,32 @@ export default function PurchaseOrders() {
           <h1 className="text-2xl font-bold text-foreground">Purchase Orders</h1>
           <p className="text-muted-foreground">Manage supplier orders and procurement</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Purchase Order
         </Button>
       </div>
+
+      {/* Dialogs */}
+      <CreatePurchaseOrderDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
+      <ViewPurchaseOrderDialog
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
+        order={selectedOrder}
+      />
+      <EditPurchaseOrderDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        order={selectedOrder}
+      />
+      <CreateGRNDialog
+        open={isGRNDialogOpen}
+        onOpenChange={setIsGRNDialogOpen}
+        order={selectedOrder}
+      />
 
       {/* Status Tabs */}
       <Tabs defaultValue="all">
@@ -190,15 +235,15 @@ export default function PurchaseOrders() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-popover">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewDetails(order)}>
                           <Eye className="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditOrder(order)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Order
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleCreateGRN(order)}>
                           <Package className="mr-2 h-4 w-4" />
                           Create GRN
                         </DropdownMenuItem>

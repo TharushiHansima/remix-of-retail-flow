@@ -14,6 +14,9 @@ import POS from "./pages/POS";
 import Products from "./pages/Products";
 import JobCards from "./pages/JobCards";
 import TechnicianBoard from "./pages/TechnicianBoard";
+import Estimates from "./pages/Estimates";
+import ServiceBilling from "./pages/ServiceBilling";
+import WarrantyJobs from "./pages/WarrantyJobs";
 import Customers from "./pages/Customers";
 import SalesReports from "./pages/SalesReports";
 import InventoryReports from "./pages/InventoryReports";
@@ -27,6 +30,9 @@ import Invoices from "./pages/Invoices";
 import GRN from "./pages/GRN";
 import StockTransfers from "./pages/StockTransfers";
 import StockAdjustments from "./pages/StockAdjustments";
+import CreditAccounts from "./pages/CreditAccounts";
+import ReceivablesAging from "./pages/ReceivablesAging";
+import ServiceHistory from "./pages/ServiceHistory";
 import ModulesConfig from "./pages/config/ModulesConfig";
 import SystemSettings from "./pages/config/SystemSettings";
 import WorkflowsConfig from "./pages/config/WorkflowsConfig";
@@ -59,7 +65,13 @@ const App = () => (
                     <Route path="/inventory/adjustments" element={<StockAdjustments />} />
                     <Route path="/repairs/jobs" element={<JobCards />} />
                     <Route path="/repairs/board" element={<TechnicianBoard />} />
+                    <Route path="/repairs/estimates" element={<Estimates />} />
+                    <Route path="/repairs/billing" element={<ServiceBilling />} />
+                    <Route path="/repairs/warranty" element={<WarrantyJobs />} />
                     <Route path="/customers" element={<Customers />} />
+                    <Route path="/customers/credit" element={<CreditAccounts />} />
+                    <Route path="/customers/receivables" element={<ReceivablesAging />} />
+                    <Route path="/customers/history" element={<ServiceHistory />} />
                     <Route path="/reports/sales" element={<SalesReports />} />
                     <Route path="/reports/inventory" element={<InventoryReports />} />
                     <Route path="/reports/repairs" element={<RepairReports />} />
