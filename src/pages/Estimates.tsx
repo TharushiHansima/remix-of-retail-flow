@@ -15,6 +15,7 @@ import {
   User,
   Smartphone,
 } from "lucide-react";
+import { CreateEstimateDialog } from "@/components/estimates/CreateEstimateDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -158,6 +159,7 @@ const statusConfig = {
 export default function Estimates() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const filteredEstimates = estimates.filter(
     (estimate) =>
@@ -178,7 +180,7 @@ export default function Estimates() {
           <h1 className="text-2xl font-bold text-foreground">Estimates</h1>
           <p className="text-muted-foreground">Create and manage repair estimates for customers</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Estimate
         </Button>
@@ -334,6 +336,8 @@ export default function Estimates() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <CreateEstimateDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
     </div>
   );
 }
