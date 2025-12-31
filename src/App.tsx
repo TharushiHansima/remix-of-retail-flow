@@ -46,6 +46,9 @@ import ApprovalsConfig from "./pages/config/ApprovalsConfig";
 import TaxPricing from "./pages/config/TaxPricing";
 import BranchSetup from "./pages/config/BranchSetup";
 import Approvals from "./pages/Approvals";
+import Profile from "./pages/Profile";
+import ChangePassword from "./pages/ChangePassword";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -101,6 +104,9 @@ const App = () => (
                     <Route path="/config/tax" element={<TaxPricing />} />
                     <Route path="/config/branches" element={<BranchSetup />} />
                     <Route path="/approvals" element={<Approvals />} />
+                    <Route path="/profile" element={<Profile />} />
+                    <Route path="/change-password" element={<ChangePassword />} />
+                    <Route path="/settings" element={<Settings />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<NotFound />} />
