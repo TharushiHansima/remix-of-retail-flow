@@ -12,6 +12,9 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import POS from "./pages/POS";
 import Products from "./pages/Products";
+import CategoriesBrands from "./pages/CategoriesBrands";
+import StockOverview from "./pages/StockOverview";
+import SerialRegistry from "./pages/SerialRegistry";
 import JobCards from "./pages/JobCards";
 import TechnicianBoard from "./pages/TechnicianBoard";
 import Estimates from "./pages/Estimates";
@@ -61,6 +64,9 @@ const App = () => (
                     <Route path="/pos" element={<POS />} />
                     <Route path="/sales/invoices" element={<Invoices />} />
                     <Route path="/inventory/products" element={<Products />} />
+                    <Route path="/inventory/categories" element={<CategoriesBrands />} />
+                    <Route path="/inventory/stock" element={<StockOverview />} />
+                    <Route path="/inventory/serials" element={<SerialRegistry />} />
                     <Route path="/inventory/transfers" element={<StockTransfers />} />
                     <Route path="/inventory/adjustments" element={<StockAdjustments />} />
                     <Route path="/repairs/jobs" element={<JobCards />} />
