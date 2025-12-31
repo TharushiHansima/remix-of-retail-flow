@@ -30,6 +30,9 @@ import Suppliers from "./pages/Suppliers";
 import ImportBatches from "./pages/ImportBatches";
 import UsersRoles from "./pages/UsersRoles";
 import Invoices from "./pages/Invoices";
+import Quotations from "./pages/Quotations";
+import ReturnsRefunds from "./pages/ReturnsRefunds";
+import Payments from "./pages/Payments";
 import GRN from "./pages/GRN";
 import StockTransfers from "./pages/StockTransfers";
 import StockAdjustments from "./pages/StockAdjustments";
@@ -63,6 +66,9 @@ const App = () => (
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/pos" element={<POS />} />
                     <Route path="/sales/invoices" element={<Invoices />} />
+                    <Route path="/sales/quotations" element={<Quotations />} />
+                    <Route path="/sales/returns" element={<ReturnsRefunds />} />
+                    <Route path="/sales/payments" element={<Payments />} />
                     <Route path="/inventory/products" element={<Products />} />
                     <Route path="/inventory/categories" element={<CategoriesBrands />} />
                     <Route path="/inventory/stock" element={<StockOverview />} />
