@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { CreateJobCardDialog } from "@/components/job-cards/CreateJobCardDialog";
 
 interface JobCard {
   id: string;
@@ -168,6 +169,7 @@ const priorityColors = {
 export default function JobCards() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const filteredJobs = jobCards.filter(
     (job) =>
@@ -188,11 +190,16 @@ export default function JobCards() {
           <h1 className="text-2xl font-bold text-foreground">Job Cards</h1>
           <p className="text-muted-foreground">Manage repair and service jobs</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Job Card
         </Button>
       </div>
+
+      <CreateJobCardDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
 
       {/* Status Tabs */}
       <Tabs defaultValue="all" className="space-y-4">
