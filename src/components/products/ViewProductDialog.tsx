@@ -16,6 +16,7 @@ interface Product {
   brand: string;
   type: "standard" | "serialized" | "batch";
   price: number;
+  wholesalePrice?: number;
   cost: number;
   stock: {
     main: number;
@@ -94,10 +95,14 @@ export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDi
             <h4 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide mb-3">
               Pricing
             </h4>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="bg-muted/50 rounded-lg p-3">
                 <p className="text-sm text-muted-foreground">Unit Price</p>
                 <p className="text-lg font-semibold">${product.price.toFixed(2)}</p>
+              </div>
+              <div className="bg-muted/50 rounded-lg p-3">
+                <p className="text-sm text-muted-foreground">Wholesale Price</p>
+                <p className="text-lg font-semibold">${(product.wholesalePrice || 0).toFixed(2)}</p>
               </div>
               <div className="bg-muted/50 rounded-lg p-3">
                 <p className="text-sm text-muted-foreground">Cost Price</p>
