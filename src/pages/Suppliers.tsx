@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,15 +9,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Search, Pencil, Trash2, Building2, Phone, Mail, MapPin, User } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Building2, Phone, Mail, User } from "lucide-react";
 import { toast } from "sonner";
-import type { Tables } from "@/integrations/supabase/types";
-
-type Supplier = Tables<"suppliers">;
+import { mockSuppliers, type Supplier } from "@/data/mockData";
 
 const Suppliers = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [deleteSupplier, setDeleteSupplier] = useState<Supplier | null>(null);
   const [formData, setFormData] = useState({
@@ -29,65 +26,6 @@ const Suppliers = () => {
     phone: "",
     address: "",
     is_active: true,
-  });
-
-  const queryClient = useQueryClient();
-
-  const { data: suppliers = [], isLoading } = useQuery({
-    queryKey: ["suppliers"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("suppliers")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data as Supplier[];
-    },
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("suppliers").insert(data);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-      toast.success("Supplier created successfully");
-      resetForm();
-    },
-    onError: (error) => {
-      toast.error("Failed to create supplier: " + error.message);
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
-      const { error } = await supabase.from("suppliers").update(data).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-      toast.success("Supplier updated successfully");
-      resetForm();
-    },
-    onError: (error) => {
-      toast.error("Failed to update supplier: " + error.message);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("suppliers").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
-      toast.success("Supplier deleted successfully");
-      setDeleteSupplier(null);
-    },
-    onError: (error) => {
-      toast.error("Failed to delete supplier: " + error.message);
-    },
   });
 
   const resetForm = () => {
@@ -119,17 +57,39 @@ const Suppliers = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingSupplier) {
-      updateMutation.mutate({ id: editingSupplier.id, data: formData });
+      setSuppliers(suppliers.map(s => 
+        s.id === editingSupplier.id 
+          ? { ...s, ...formData }
+          : s
+      ));
+      toast.success("Supplier updated successfully");
     } else {
-      createMutation.mutate(formData);
+      const newSupplier: Supplier = {
+        id: String(suppliers.length + 1),
+        ...formData,
+        created_at: new Date().toISOString(),
+      };
+      setSuppliers([...suppliers, newSupplier]);
+      toast.success("Supplier created successfully");
     }
+    resetForm();
   };
 
-  const handleToggleActive = async (supplier: Supplier) => {
-    updateMutation.mutate({
-      id: supplier.id,
-      data: { ...supplier, is_active: !supplier.is_active },
-    });
+  const handleToggleActive = (supplier: Supplier) => {
+    setSuppliers(suppliers.map(s =>
+      s.id === supplier.id
+        ? { ...s, is_active: !s.is_active }
+        : s
+    ));
+    toast.success(`Supplier ${supplier.is_active ? 'deactivated' : 'activated'}`);
+  };
+
+  const handleDelete = () => {
+    if (deleteSupplier) {
+      setSuppliers(suppliers.filter(s => s.id !== deleteSupplier.id));
+      toast.success("Supplier deleted successfully");
+      setDeleteSupplier(null);
+    }
   };
 
   const filteredSuppliers = suppliers.filter(
@@ -218,7 +178,7 @@ const Suppliers = () => {
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+                <Button type="submit">
                   {editingSupplier ? "Update" : "Create"}
                 </Button>
               </DialogFooter>
@@ -243,9 +203,7 @@ const Suppliers = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading suppliers...</div>
-          ) : filteredSuppliers.length === 0 ? (
+          {filteredSuppliers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {searchQuery ? "No suppliers match your search" : "No suppliers found. Add your first supplier!"}
             </div>
@@ -331,7 +289,7 @@ const Suppliers = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => deleteSupplier && deleteMutation.mutate(deleteSupplier.id)}
+              onClick={handleDelete}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
