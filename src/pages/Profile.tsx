@@ -82,7 +82,7 @@ export default function Profile() {
                 Account Status: <span className="text-primary font-medium capitalize">{profile?.approval_status || "Pending"}</span>
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Member since: {new Date(user?.created_at || Date.now()).toLocaleDateString()}
+                Member since: {new Date(Date.now()).toLocaleDateString()}
               </p>
             </div>
           </CardContent>

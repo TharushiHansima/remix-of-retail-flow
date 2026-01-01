@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Search,
   Plus,
@@ -43,43 +43,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
 import { useConfig } from "@/contexts/ConfigContext";
-import { CreateInvoiceForm } from "@/components/invoices/CreateInvoiceForm";
-import { RecordPaymentModal } from "@/components/invoices/RecordPaymentModal";
-import { PaymentHistory } from "@/components/invoices/PaymentHistory";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { mockInvoices, mockCustomers, mockInvoiceItems, mockProducts, type Invoice } from "@/data/mockData";
 
-interface InvoiceItem {
-  id: string;
-  product_id: string;
-  quantity: number;
-  unit_price: number;
-  discount_percent: number;
-  tax_percent: number;
-  total: number;
-  products?: { name: string; sku: string } | null;
-}
-
-interface Invoice {
-  id: string;
-  invoice_number: string;
-  invoice_type: string;
-  status: string;
-  subtotal: number;
-  discount_amount: number;
-  tax_amount: number;
-  total_amount: number;
-  paid_amount: number;
-  notes: string | null;
-  created_at: string;
-  customer_id: string | null;
+interface InvoiceWithDetails extends Invoice {
   customers?: { name: string; email: string | null } | null;
-  invoice_items?: InvoiceItem[];
+  invoice_items?: Array<{
+    id: string;
+    product_id: string;
+    quantity: number;
+    unit_price: number;
+    discount_percent: number | null;
+    tax_percent: number | null;
+    total: number;
+    products?: { name: string; sku: string } | null;
+  }>;
 }
 
 const statusColors: Record<string, string> = {
@@ -97,53 +79,37 @@ const typeLabels: Record<string, string> = {
   return: "Return",
 };
 
+// Build invoices with related data
+const getInvoicesWithDetails = (): InvoiceWithDetails[] => {
+  return mockInvoices.map(invoice => {
+    const customer = mockCustomers.find(c => c.id === invoice.customer_id);
+    const items = mockInvoiceItems
+      .filter(item => item.invoice_id === invoice.id)
+      .map(item => {
+        const product = mockProducts.find(p => p.id === item.product_id);
+        return {
+          ...item,
+          discount_percent: item.discount_percent ?? 0,
+          tax_percent: item.tax_percent ?? 0,
+          products: product ? { name: product.name, sku: product.sku } : null,
+        };
+      });
+    return {
+      ...invoice,
+      customers: customer ? { name: customer.name, email: customer.email } : null,
+      invoice_items: items,
+    };
+  });
+};
+
 export default function Invoices() {
   const { formatCurrency } = useConfig();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [invoices] = useState<InvoiceWithDetails[]>(getInvoicesWithDetails());
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithDetails | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [showCreateForm, setShowCreateForm] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [paymentInvoice, setPaymentInvoice] = useState<Invoice | null>(null);
-  const [paymentRefreshTrigger, setPaymentRefreshTrigger] = useState(0);
-
-  const fetchInvoices = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("invoices")
-        .select(`
-          *,
-          customers(name, email),
-          invoice_items(
-            id,
-            product_id,
-            quantity,
-            unit_price,
-            discount_percent,
-            tax_percent,
-            total,
-            products(name, sku)
-          )
-        `)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setInvoices(data || []);
-    } catch (error) {
-      console.error("Error fetching invoices:", error);
-      toast.error("Failed to load invoices");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchInvoices();
-  }, []);
 
   const filteredInvoices = invoices.filter((inv) => {
     const matchesSearch =
@@ -162,31 +128,13 @@ export default function Invoices() {
     .filter((i) => i.status === "pending" || i.status === "partial")
     .reduce((sum, i) => sum + (i.total_amount - i.paid_amount), 0);
 
-  const handleFormSuccess = () => {
-    setShowCreateForm(false);
-    fetchInvoices();
+  const handleNewInvoice = () => {
+    toast.info("New Invoice form - coming soon with database integration");
   };
 
-  const handlePaymentSuccess = () => {
-    setPaymentRefreshTrigger((t) => t + 1);
-    fetchInvoices();
+  const openPaymentModal = (invoice: InvoiceWithDetails) => {
+    toast.info("Record Payment - coming soon with database integration");
   };
-
-  const openPaymentModal = (invoice: Invoice) => {
-    setPaymentInvoice(invoice);
-    setPaymentModalOpen(true);
-  };
-
-  if (showCreateForm) {
-    return (
-      <div className="space-y-6">
-        <CreateInvoiceForm 
-          onSuccess={handleFormSuccess} 
-          onCancel={() => setShowCreateForm(false)} 
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -201,7 +149,7 @@ export default function Invoices() {
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button size="sm" onClick={() => setShowCreateForm(true)}>
+          <Button size="sm" onClick={handleNewInvoice}>
             <Plus className="h-4 w-4 mr-2" />
             New Invoice
           </Button>
@@ -284,102 +232,94 @@ export default function Invoices() {
 
       {/* Invoices Table */}
       <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="p-6 space-y-4">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead>Invoice #</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Paid</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-12"></TableHead>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead>Invoice #</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Paid</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="w-12"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredInvoices.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  {invoices.length === 0 ? "No invoices yet. Create your first invoice!" : "No invoices match your filters"}
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredInvoices.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    {invoices.length === 0 ? "No invoices yet. Create your first invoice!" : "No invoices match your filters"}
+            ) : (
+              filteredInvoices.map((invoice) => (
+                <TableRow key={invoice.id} className="hover:bg-muted/30">
+                  <TableCell className="font-mono font-medium">{invoice.invoice_number}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{invoice.customers?.name || "Walk-in"}</p>
+                      {invoice.customers?.email && (
+                        <p className="text-xs text-muted-foreground">{invoice.customers.email}</p>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{typeLabels[invoice.invoice_type] || invoice.invoice_type}</Badge>
+                  </TableCell>
+                  <TableCell>{format(new Date(invoice.created_at), "MMM dd, yyyy")}</TableCell>
+                  <TableCell className="text-right font-medium">{formatCurrency(invoice.total_amount)}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(invoice.paid_amount)}</TableCell>
+                  <TableCell>
+                    <Badge className={statusColors[invoice.status] || statusColors.draft}>
+                      {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-popover">
+                        <DropdownMenuItem onClick={() => {
+                          setSelectedInvoice(invoice);
+                          setViewDialogOpen(true);
+                        }}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Printer className="mr-2 h-4 w-4" />
+                          Print
+                        </DropdownMenuItem>
+                        {invoice.status !== "paid" && invoice.status !== "cancelled" && invoice.invoice_type !== "quotation" && (
+                          <DropdownMenuItem onClick={() => openPaymentModal(invoice)}>
+                            <CreditCard className="mr-2 h-4 w-4" />
+                            Record Payment
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem>
+                          <Send className="mr-2 h-4 w-4" />
+                          Send Email
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive">
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ) : (
-                filteredInvoices.map((invoice) => (
-                  <TableRow key={invoice.id} className="hover:bg-muted/30">
-                    <TableCell className="font-mono font-medium">{invoice.invoice_number}</TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{invoice.customers?.name || "Walk-in"}</p>
-                        {invoice.customers?.email && (
-                          <p className="text-xs text-muted-foreground">{invoice.customers.email}</p>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{typeLabels[invoice.invoice_type] || invoice.invoice_type}</Badge>
-                    </TableCell>
-                    <TableCell>{format(new Date(invoice.created_at), "MMM dd, yyyy")}</TableCell>
-                    <TableCell className="text-right font-medium">{formatCurrency(invoice.total_amount)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(invoice.paid_amount)}</TableCell>
-                    <TableCell>
-                      <Badge className={statusColors[invoice.status] || statusColors.draft}>
-                        {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-popover">
-                          <DropdownMenuItem onClick={() => {
-                            setSelectedInvoice(invoice);
-                            setViewDialogOpen(true);
-                          }}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="mr-2 h-4 w-4" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Printer className="mr-2 h-4 w-4" />
-                            Print
-                          </DropdownMenuItem>
-                          {invoice.status !== "paid" && invoice.status !== "cancelled" && invoice.invoice_type !== "quotation" && (
-                            <DropdownMenuItem onClick={() => openPaymentModal(invoice)}>
-                              <CreditCard className="mr-2 h-4 w-4" />
-                              Record Payment
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem>
-                            <Send className="mr-2 h-4 w-4" />
-                            Send Email
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        )}
+              ))
+            )}
+          </TableBody>
+        </Table>
       </div>
 
       {/* View Invoice Dialog */}
@@ -459,7 +399,8 @@ export default function Invoices() {
                     <span className="text-muted-foreground">Tax</span>
                     <span>{formatCurrency(selectedInvoice.tax_amount)}</span>
                   </div>
-                  <div className="flex justify-between font-medium pt-2 border-t">
+                  <Separator />
+                  <div className="flex justify-between font-medium">
                     <span>Total</span>
                     <span>{formatCurrency(selectedInvoice.total_amount)}</span>
                   </div>
@@ -475,49 +416,10 @@ export default function Invoices() {
                   )}
                 </div>
               </div>
-
-              {selectedInvoice.notes && (
-                <div className="pt-4 border-t">
-                  <p className="text-sm text-muted-foreground">Notes</p>
-                  <p className="text-sm">{selectedInvoice.notes}</p>
-                </div>
-              )}
-
-              {/* Payment History */}
-              {selectedInvoice.invoice_type !== "quotation" && (
-                <div className="pt-4 border-t">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-medium">Payment History</p>
-                    {selectedInvoice.status !== "paid" && selectedInvoice.status !== "cancelled" && (
-                      <Button size="sm" variant="outline" onClick={() => {
-                        setViewDialogOpen(false);
-                        openPaymentModal(selectedInvoice);
-                      }}>
-                        <CreditCard className="h-4 w-4 mr-2" />
-                        Record Payment
-                      </Button>
-                    )}
-                  </div>
-                  <PaymentHistory invoiceId={selectedInvoice.id} refreshTrigger={paymentRefreshTrigger} />
-                </div>
-              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Payment Modal */}
-      {paymentInvoice && (
-        <RecordPaymentModal
-          open={paymentModalOpen}
-          onOpenChange={setPaymentModalOpen}
-          invoiceId={paymentInvoice.id}
-          invoiceNumber={paymentInvoice.invoice_number}
-          totalAmount={paymentInvoice.total_amount}
-          paidAmount={paymentInvoice.paid_amount}
-          onSuccess={handlePaymentSuccess}
-        />
-      )}
     </div>
   );
 }
