@@ -27,6 +27,7 @@ interface Product {
   brand: string;
   type: "standard" | "serialized" | "batch";
   price: number;
+  wholesalePrice?: number;
   cost: number;
   stock: {
     main: number;
@@ -50,6 +51,7 @@ export function EditProductDialog({ open, onOpenChange, product }: EditProductDi
     category: "",
     brand: "",
     unitPrice: "",
+    wholesalePrice: "",
     costPrice: "",
     minStockLevel: "",
     maxStockLevel: "",
@@ -68,6 +70,7 @@ export function EditProductDialog({ open, onOpenChange, product }: EditProductDi
         category: product.category.toLowerCase(),
         brand: product.brand.toLowerCase(),
         unitPrice: product.price.toString(),
+        wholesalePrice: product.wholesalePrice?.toString() || "0",
         costPrice: product.cost.toString(),
         minStockLevel: "0",
         maxStockLevel: "100",
@@ -174,7 +177,7 @@ export function EditProductDialog({ open, onOpenChange, product }: EditProductDi
             <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
               Pricing
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="unitPrice">Unit Price *</Label>
                 <Input
@@ -185,6 +188,17 @@ export function EditProductDialog({ open, onOpenChange, product }: EditProductDi
                   onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })}
                   placeholder="0.00"
                   required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="wholesalePrice">Wholesale Price</Label>
+                <Input
+                  id="wholesalePrice"
+                  type="number"
+                  step="0.01"
+                  value={formData.wholesalePrice}
+                  onChange={(e) => setFormData({ ...formData, wholesalePrice: e.target.value })}
+                  placeholder="0.00"
                 />
               </div>
               <div className="space-y-2">
