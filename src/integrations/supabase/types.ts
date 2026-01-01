@@ -583,6 +583,7 @@ export type Database = {
           sku: string
           unit_price: number
           updated_at: string
+          wholesale_price: number
         }
         Insert: {
           brand_id?: string | null
@@ -602,6 +603,7 @@ export type Database = {
           sku: string
           unit_price?: number
           updated_at?: string
+          wholesale_price?: number
         }
         Update: {
           brand_id?: string | null
@@ -621,6 +623,7 @@ export type Database = {
           sku?: string
           unit_price?: number
           updated_at?: string
+          wholesale_price?: number
         }
         Relationships: [
           {

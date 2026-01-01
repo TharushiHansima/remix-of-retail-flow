@@ -33,6 +33,7 @@ export function AddProductDialog({ open, onOpenChange }: AddProductDialogProps) 
     brand: "",
     type: "standard",
     unitPrice: "",
+    wholesalePrice: "",
     costPrice: "",
     minStockLevel: "",
     maxStockLevel: "",
@@ -135,7 +136,7 @@ export function AddProductDialog({ open, onOpenChange }: AddProductDialogProps) 
             <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">
               Pricing
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="unitPrice">Unit Price *</Label>
                 <Input
@@ -146,6 +147,17 @@ export function AddProductDialog({ open, onOpenChange }: AddProductDialogProps) 
                   onChange={(e) => setFormData({ ...formData, unitPrice: e.target.value })}
                   placeholder="0.00"
                   required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="wholesalePrice">Wholesale Price</Label>
+                <Input
+                  id="wholesalePrice"
+                  type="number"
+                  step="0.01"
+                  value={formData.wholesalePrice}
+                  onChange={(e) => setFormData({ ...formData, wholesalePrice: e.target.value })}
+                  placeholder="0.00"
                 />
               </div>
               <div className="space-y-2">
