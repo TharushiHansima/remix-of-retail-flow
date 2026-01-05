@@ -53,14 +53,18 @@ const mockRoles: UserRole[] = [{ role: "admin" }];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Auto-login with mock user for development
-  const [user] = useState<User | null>(mockUser);
-  const [session] = useState<unknown | null>({});
-  const [profile] = useState<Profile | null>(mockProfile);
-  const [roles] = useState<UserRole[]>(mockRoles);
+  const [user, setUser] = useState<User | null>(mockUser);
+  const [session, setSession] = useState<unknown | null>({});
+  const [profile, setProfile] = useState<Profile | null>(mockProfile);
+  const [roles, setRoles] = useState<UserRole[]>(mockRoles);
   const [isLoading] = useState(false);
 
   const signIn = async (_email: string, _password: string) => {
-    // Mock sign in - always succeeds
+    // Mock sign in - restore mock user
+    setUser(mockUser);
+    setSession({});
+    setProfile(mockProfile);
+    setRoles(mockRoles);
     return { error: null };
   };
 
@@ -70,7 +74,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    // Mock sign out - does nothing in demo mode
+    // Clear user state to simulate logout
+    setUser(null);
+    setSession(null);
+    setProfile(null);
+    setRoles([]);
   };
 
   const hasRole = (role: "admin" | "manager" | "cashier" | "technician") => {
