@@ -45,6 +45,9 @@ import WorkflowsConfig from "./pages/config/WorkflowsConfig";
 import ApprovalsConfig from "./pages/config/ApprovalsConfig";
 import TaxPricing from "./pages/config/TaxPricing";
 import BranchSetup from "./pages/config/BranchSetup";
+import AuditTrail from "./pages/config/AuditTrail";
+import SecuritySettings from "./pages/config/SecuritySettings";
+import CompanySettings from "./pages/config/CompanySettings";
 import Approvals from "./pages/Approvals";
 import UserApprovals from "./pages/UserApprovals";
 import Profile from "./pages/Profile";
@@ -105,6 +108,9 @@ const App = () => (
                     <Route path="/config/approvals" element={<ApprovalsConfig />} />
                     <Route path="/config/tax" element={<TaxPricing />} />
                     <Route path="/config/branches" element={<BranchSetup />} />
+                    <Route path="/config/audit-trail" element={<AuditTrail />} />
+                    <Route path="/config/security" element={<SecuritySettings />} />
+                    <Route path="/config/company" element={<CompanySettings />} />
                     <Route path="/approvals" element={<Approvals />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/change-password" element={<ChangePassword />} />
