@@ -46,6 +46,7 @@ import ApprovalsConfig from "./pages/config/ApprovalsConfig";
 import TaxPricing from "./pages/config/TaxPricing";
 import BranchSetup from "./pages/config/BranchSetup";
 import Approvals from "./pages/Approvals";
+import UserApprovals from "./pages/UserApprovals";
 import Profile from "./pages/Profile";
 import ChangePassword from "./pages/ChangePassword";
 import Settings from "./pages/Settings";
@@ -97,6 +98,7 @@ const App = () => (
                     <Route path="/suppliers/batches" element={<ImportBatches />} />
                     <Route path="/suppliers/grn" element={<GRN />} />
                     <Route path="/config/users" element={<UsersRoles />} />
+                    <Route path="/config/user-approvals" element={<UserApprovals />} />
                     <Route path="/config/modules" element={<ModulesConfig />} />
                     <Route path="/config/system" element={<SystemSettings />} />
                     <Route path="/config/workflows" element={<WorkflowsConfig />} />

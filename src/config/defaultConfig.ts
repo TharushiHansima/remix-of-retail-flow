@@ -317,6 +317,7 @@ export const navigationConfig: NavItem[] = [
     requiredRoles: ['admin', 'manager'],
     children: [
       { id: 'users', title: 'Users & Roles', href: '/config/users', requiredRoles: ['admin'] },
+      { id: 'user-approvals', title: 'User Approvals', href: '/config/user-approvals', requiredRoles: ['admin'] },
       { id: 'system', title: 'System Settings', href: '/config/system', requiredRoles: ['admin'] },
       { id: 'modules', title: 'Modules', href: '/config/modules', requiredRoles: ['admin'] },
       { id: 'workflows', title: 'Workflows', href: '/config/workflows', requiredRoles: ['admin'] },
