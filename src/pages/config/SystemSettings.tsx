@@ -8,6 +8,29 @@ import { useConfig } from "@/contexts/ConfigContext";
 import { toast } from "sonner";
 import { Save, RotateCcw } from "lucide-react";
 
+const currencyOptions = [
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'LKR', symbol: 'Rs', name: 'Sri Lankan Rupee' },
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+  { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
+  { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' },
+  { code: 'AED', symbol: 'د.إ', name: 'UAE Dirham' },
+  { code: 'SAR', symbol: 'ر.س', name: 'Saudi Riyal' },
+  { code: 'SGD', symbol: 'S$', name: 'Singapore Dollar' },
+  { code: 'MYR', symbol: 'RM', name: 'Malaysian Ringgit' },
+  { code: 'THB', symbol: '฿', name: 'Thai Baht' },
+  { code: 'PHP', symbol: '₱', name: 'Philippine Peso' },
+  { code: 'PKR', symbol: 'Rs', name: 'Pakistani Rupee' },
+  { code: 'BDT', symbol: '৳', name: 'Bangladeshi Taka' },
+  { code: 'ZAR', symbol: 'R', name: 'South African Rand' },
+  { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
+  { code: 'KES', symbol: 'KSh', name: 'Kenyan Shilling' },
+];
+
 export default function SystemSettings() {
   const { config, updateConfig } = useConfig();
   const [localConfig, setLocalConfig] = useState(config);
@@ -108,18 +131,46 @@ export default function SystemSettings() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Currency Code</Label>
-                <Input
+                <Label>Currency</Label>
+                <Select
                   value={localConfig.localization.currency}
-                  onChange={(e) => handleLocalizationChange('currency', e.target.value)}
-                />
+                  onValueChange={(value) => {
+                    const selected = currencyOptions.find(c => c.code === value);
+                    if (selected) {
+                      handleLocalizationChange('currency', selected.code);
+                      handleLocalizationChange('currencySymbol', selected.symbol);
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currencyOptions.map((currency) => (
+                      <SelectItem key={currency.code} value={currency.code}>
+                        {currency.code} - {currency.name} ({currency.symbol})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Currency Symbol</Label>
-                <Input
+                <Select
                   value={localConfig.localization.currencySymbol}
-                  onChange={(e) => handleLocalizationChange('currencySymbol', e.target.value)}
-                />
+                  onValueChange={(value) => handleLocalizationChange('currencySymbol', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select symbol" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {currencyOptions.map((currency) => (
+                      <SelectItem key={currency.symbol + currency.code} value={currency.symbol}>
+                        {currency.symbol} ({currency.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
