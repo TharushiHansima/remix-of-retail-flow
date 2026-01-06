@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// CategoriesBrands.tsx
+import { useEffect, useState } from 'react';
 import { Plus, Edit, Trash2, Tag, Award } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,46 +42,156 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 
-// Mock data
-const mockCategories = [
-  { id: '1', name: 'Mobile Phones', parentId: null, productCount: 45 },
-  { id: '2', name: 'Smartphones', parentId: '1', productCount: 32 },
-  { id: '3', name: 'Feature Phones', parentId: '1', productCount: 13 },
-  { id: '4', name: 'Accessories', parentId: null, productCount: 120 },
-  { id: '5', name: 'Cases & Covers', parentId: '4', productCount: 65 },
-  { id: '6', name: 'Chargers', parentId: '4', productCount: 35 },
-  { id: '7', name: 'Laptops', parentId: null, productCount: 28 },
-  { id: '8', name: 'Tablets', parentId: null, productCount: 15 },
-];
+/* =========================
+   API (added only)
+   ========================= */
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000').replace(/\/$/, '');
+const ACCESS_TOKEN_KEY = 'erp.accessToken';
 
-const mockBrands = [
-  { id: '1', name: 'Apple', productCount: 42 },
-  { id: '2', name: 'Samsung', productCount: 38 },
-  { id: '3', name: 'Xiaomi', productCount: 25 },
-  { id: '4', name: 'OnePlus', productCount: 18 },
-  { id: '5', name: 'Google', productCount: 12 },
-  { id: '6', name: 'Sony', productCount: 15 },
-  { id: '7', name: 'LG', productCount: 10 },
-  { id: '8', name: 'Huawei', productCount: 8 },
-];
+type ApiBrand = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ApiCategory = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function getAuthHeader() {
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function extractErrorMessage(data: any): string {
+  if (!data) return 'Request failed';
+  if (typeof data === 'string') return data;
+  if (Array.isArray(data.message)) return data.message.join(', ');
+  return data.message || data.error || 'Request failed';
+}
+
+async function apiRequest<T>(
+  path: string,
+  options: RequestInit & { json?: unknown } = {},
+): Promise<T> {
+  const url = path.startsWith('http')
+    ? path
+    : `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+
+  const headers = new Headers(options.headers);
+  headers.set('Accept', 'application/json');
+
+  if (options.json !== undefined) headers.set('Content-Type', 'application/json');
+
+  // JwtAuthGuard -> require token
+  const auth = getAuthHeader();
+  Object.entries(auth).forEach(([k, v]) => headers.set(k, v));
+
+  const res = await fetch(url, {
+    ...options,
+    headers,
+    body: options.json !== undefined ? JSON.stringify(options.json) : options.body,
+  });
+
+  const contentType = res.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+  const data = isJson ? await res.json().catch(() => null) : await res.text().catch(() => null);
+
+  if (!res.ok) throw new Error(extractErrorMessage(data));
+  return data as T;
+}
+
+// brands
+async function listBrandsApi() {
+  // controller supports includeDisabled but not needed for UI
+  return apiRequest<ApiBrand[]>('/inventory/brands', { method: 'GET' });
+}
+async function createBrandApi(name: string) {
+  return apiRequest<ApiBrand>('/inventory/brands', { method: 'POST', json: { name } });
+}
+async function updateBrandApi(id: string, name: string) {
+  return apiRequest<ApiBrand>(`/inventory/brands/${id}`, { method: 'PATCH', json: { name } });
+}
+async function disableBrandApi(id: string) {
+  return apiRequest<ApiBrand>(`/inventory/brands/${id}/disable`, { method: 'PATCH' });
+}
+
+// categories
+async function listCategoriesApi() {
+  return apiRequest<ApiCategory[]>('/inventory/categories', { method: 'GET' });
+}
+async function createCategoryApi(input: { name: string; parentId?: string }) {
+  return apiRequest<ApiCategory>('/inventory/categories', { method: 'POST', json: input });
+}
+async function updateCategoryApi(id: string, input: { name?: string; parentId?: string | null }) {
+  return apiRequest<ApiCategory>(`/inventory/categories/${id}`, { method: 'PATCH', json: input });
+}
+async function disableCategoryApi(id: string) {
+  return apiRequest<ApiCategory>(`/inventory/categories/${id}/disable`, { method: 'PATCH' });
+}
+
+/* =========================
+   UI types (same shape as before)
+   ========================= */
+type Category = { id: string; name: string; parentId: string | null; productCount: number };
+type Brand = { id: string; name: string; productCount: number };
 
 export default function CategoriesBrands() {
-  const [categories, setCategories] = useState(mockCategories);
-  const [brands, setBrands] = useState(mockBrands);
+  // ✅ removed dummy data
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [brandDialogOpen, setBrandDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<typeof mockCategories[0] | null>(null);
-  const [editingBrand, setEditingBrand] = useState<typeof mockBrands[0] | null>(null);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryParent, setNewCategoryParent] = useState<string>('none');
   const [newBrandName, setNewBrandName] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState<{ type: 'category' | 'brand'; id: string; name: string } | null>(null);
 
+  // ✅ load categories + brands from backend
+  useEffect(() => {
+    const loadAll = async () => {
+      try {
+        const [cats, brs] = await Promise.all([listCategoriesApi(), listBrandsApi()]);
+
+        setCategories(
+          cats.map((c) => ({
+            id: c.id,
+            name: c.name,
+            parentId: c.parentId ?? null,
+            productCount: 0, // backend not sending productCount
+          })),
+        );
+
+        setBrands(
+          brs.map((b) => ({
+            id: b.id,
+            name: b.name,
+            productCount: 0, // backend not sending productCount
+          })),
+        );
+      } catch (e: any) {
+        toast.error(e?.message || 'Failed to load categories/brands');
+      }
+    };
+
+    void loadAll();
+  }, []);
+
   const parentCategories = categories.filter(c => !c.parentId);
 
-  const getCategoryHierarchy = (category: typeof mockCategories[0]) => {
+  const getCategoryHierarchy = (category: Category) => {
     if (!category.parentId) return category.name;
     const parent = categories.find(c => c.id === category.parentId);
     return parent ? `${parent.name} → ${category.name}` : category.name;
@@ -91,80 +202,147 @@ export default function CategoriesBrands() {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
+  // ✅ Brand: "delete" -> DISABLE
+  // ✅ Category: controller also provides DISABLE (no delete), so we disable + remove from UI
+  const handleConfirmDelete = async () => {
     if (!deletingItem) return;
+
     if (deletingItem.type === 'category') {
-      setCategories(categories.filter(c => c.id !== deletingItem.id && c.parentId !== deletingItem.id));
-      toast.success('Category deleted successfully');
-    } else {
+      try {
+        await disableCategoryApi(deletingItem.id);
+
+        // keep same UI behavior as before (remove category + direct subcategories from UI)
+        setCategories(categories.filter(c => c.id !== deletingItem.id && c.parentId !== deletingItem.id));
+        toast.success('Category deleted successfully');
+      } catch (e: any) {
+        toast.error(e?.message || 'Failed to disable category');
+      } finally {
+        setDeleteDialogOpen(false);
+        setDeletingItem(null);
+      }
+      return;
+    }
+
+    try {
+      await disableBrandApi(deletingItem.id);
+
+      // keep same UI behavior as before (remove brand from UI)
       setBrands(brands.filter(b => b.id !== deletingItem.id));
       toast.success('Brand deleted successfully');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to disable brand');
+    } finally {
+      setDeleteDialogOpen(false);
+      setDeletingItem(null);
     }
-    setDeleteDialogOpen(false);
-    setDeletingItem(null);
   };
 
-  const handleAddCategory = () => {
+  // ✅ Category create -> POST /inventory/categories
+  const handleAddCategory = async () => {
     if (!newCategoryName.trim()) return;
-    const newCategory = {
-      id: Date.now().toString(),
-      name: newCategoryName,
-      parentId: newCategoryParent === 'none' ? null : newCategoryParent,
-      productCount: 0,
-    };
-    setCategories([...categories, newCategory]);
-    setNewCategoryName('');
-    setNewCategoryParent('none');
-    setCategoryDialogOpen(false);
-    toast.success('Category added successfully');
+
+    try {
+      const created = await createCategoryApi({
+        name: newCategoryName.trim(),
+        ...(newCategoryParent === 'none' ? {} : { parentId: newCategoryParent }),
+      });
+
+      const newCategory: Category = {
+        id: created.id,
+        name: created.name,
+        parentId: created.parentId ?? null,
+        productCount: 0,
+      };
+
+      setCategories([newCategory, ...categories]);
+
+      setNewCategoryName('');
+      setNewCategoryParent('none');
+      setCategoryDialogOpen(false);
+      toast.success('Category added successfully');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to add category');
+    }
   };
 
-  const handleEditCategory = () => {
+  // ✅ Category update -> PATCH /inventory/categories/:id
+  const handleEditCategory = async () => {
     if (!editingCategory || !newCategoryName.trim()) return;
-    setCategories(categories.map(c => 
-      c.id === editingCategory.id 
-        ? { ...c, name: newCategoryName, parentId: newCategoryParent === 'none' ? null : newCategoryParent }
-        : c
-    ));
-    setEditingCategory(null);
-    setNewCategoryName('');
-    setNewCategoryParent('none');
-    setCategoryDialogOpen(false);
-    toast.success('Category updated successfully');
+
+    try {
+      const updated = await updateCategoryApi(editingCategory.id, {
+        name: newCategoryName.trim(),
+        parentId: newCategoryParent === 'none' ? null : newCategoryParent,
+      });
+
+      setCategories(
+        categories.map((c) =>
+          c.id === editingCategory.id
+            ? { ...c, name: updated.name, parentId: updated.parentId ?? null }
+            : c,
+        ),
+      );
+
+      setEditingCategory(null);
+      setNewCategoryName('');
+      setNewCategoryParent('none');
+      setCategoryDialogOpen(false);
+      toast.success('Category updated successfully');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update category');
+    }
   };
 
-  const handleAddBrand = () => {
+  // ✅ Brand create -> POST /inventory/brands
+  const handleAddBrand = async () => {
     if (!newBrandName.trim()) return;
-    const newBrand = {
-      id: Date.now().toString(),
-      name: newBrandName,
-      productCount: 0,
-    };
-    setBrands([...brands, newBrand]);
-    setNewBrandName('');
-    setBrandDialogOpen(false);
-    toast.success('Brand added successfully');
+
+    try {
+      const created = await createBrandApi(newBrandName.trim());
+
+      const newBrand: Brand = {
+        id: created.id,
+        name: created.name,
+        productCount: 0,
+      };
+
+      setBrands([newBrand, ...brands]);
+      setNewBrandName('');
+      setBrandDialogOpen(false);
+      toast.success('Brand added successfully');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to add brand');
+    }
   };
 
-  const handleEditBrand = () => {
+  // ✅ Brand update -> PATCH /inventory/brands/:id
+  const handleEditBrand = async () => {
     if (!editingBrand || !newBrandName.trim()) return;
-    setBrands(brands.map(b => 
-      b.id === editingBrand.id ? { ...b, name: newBrandName } : b
-    ));
-    setEditingBrand(null);
-    setNewBrandName('');
-    setBrandDialogOpen(false);
-    toast.success('Brand updated successfully');
+
+    try {
+      const updated = await updateBrandApi(editingBrand.id, newBrandName.trim());
+
+      setBrands(brands.map(b =>
+        b.id === editingBrand.id ? { ...b, name: updated.name } : b
+      ));
+
+      setEditingBrand(null);
+      setNewBrandName('');
+      setBrandDialogOpen(false);
+      toast.success('Brand updated successfully');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update brand');
+    }
   };
 
-  const openEditCategory = (category: typeof mockCategories[0]) => {
+  const openEditCategory = (category: Category) => {
     setEditingCategory(category);
     setNewCategoryName(category.name);
     setNewCategoryParent(category.parentId || 'none');
     setCategoryDialogOpen(true);
   };
 
-  const openEditBrand = (brand: typeof mockBrands[0]) => {
+  const openEditBrand = (brand: Brand) => {
     setEditingBrand(brand);
     setNewBrandName(brand.name);
     setBrandDialogOpen(true);
@@ -395,14 +573,14 @@ export default function CategoriesBrands() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deletingItem?.type === 'category' ? 'Category' : 'Brand'}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deletingItem?.name}"? 
+              Are you sure you want to delete "{deletingItem?.name}"?
               {deletingItem?.type === 'category' && ' This will also delete all subcategories.'}
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction onClick={() => void handleConfirmDelete()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
