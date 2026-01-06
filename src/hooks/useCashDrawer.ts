@@ -18,6 +18,13 @@ interface CashDrawer {
   notes: string | null;
 }
 
+interface CashTransaction {
+  id: string;
+  drawer_id: string;
+  transaction_type: string;
+  amount: number;
+}
+
 export function useCashDrawer() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -38,6 +45,35 @@ export function useCashDrawer() {
     },
     enabled: !!user?.id,
   });
+
+  // Fetch transactions for the active drawer to calculate balance
+  const { data: transactions } = useQuery({
+    queryKey: ["drawer-transactions", activeDrawer?.id],
+    queryFn: async () => {
+      if (!activeDrawer?.id) return [];
+      
+      const { data, error } = await supabase
+        .from("cash_transactions")
+        .select("id, drawer_id, transaction_type, amount")
+        .eq("drawer_id", activeDrawer.id);
+
+      if (error) throw error;
+      return data as CashTransaction[];
+    },
+    enabled: !!activeDrawer?.id,
+  });
+
+  // Calculate drawer balance
+  const drawerBalance = activeDrawer
+    ? (transactions || []).reduce((balance, tx) => {
+        if (tx.transaction_type === "sale" || tx.transaction_type === "cash_in") {
+          return balance + Number(tx.amount);
+        } else if (tx.transaction_type === "refund" || tx.transaction_type === "cash_out") {
+          return balance - Number(tx.amount);
+        }
+        return balance;
+      }, Number(activeDrawer.opening_float))
+    : 0;
 
   // Record a sale transaction
   const recordSaleMutation = useMutation({
@@ -128,6 +164,7 @@ export function useCashDrawer() {
     activeDrawer,
     isLoading,
     hasActiveDrawer: !!activeDrawer,
+    drawerBalance,
     recordSale: recordSaleMutation.mutateAsync,
     recordRefund: recordRefundMutation.mutateAsync,
     isRecordingSale: recordSaleMutation.isPending,

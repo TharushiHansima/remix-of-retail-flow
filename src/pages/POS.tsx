@@ -12,6 +12,7 @@ import {
   Printer,
   Mail,
   User,
+  Wallet,
   Percent,
   ShoppingCart,
   History,
@@ -85,7 +86,7 @@ export default function POS() {
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
   
   // Cash drawer integration
-  const { activeDrawer, hasActiveDrawer, recordSale, recordRefund, isRecordingSale } = useCashDrawer();
+  const { activeDrawer, hasActiveDrawer, drawerBalance, recordSale, recordRefund, isRecordingSale } = useCashDrawer();
   
   // Dialogs
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -275,8 +276,19 @@ export default function POS() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Cash Drawer Warning */}
-      {!hasActiveDrawer && (
+      {/* Cash Drawer Status */}
+      {hasActiveDrawer ? (
+        <div className="flex items-center justify-between px-4 py-2 bg-secondary/50 rounded-lg border border-border">
+          <div className="flex items-center gap-2 text-sm">
+            <Wallet className="h-4 w-4 text-primary" />
+            <span className="text-muted-foreground">Cash Drawer:</span>
+            <span className="font-semibold text-foreground">${drawerBalance.toFixed(2)}</span>
+          </div>
+          <Badge variant="secondary" className="text-xs">
+            Opened {new Date(activeDrawer.opened_at).toLocaleTimeString()}
+          </Badge>
+        </div>
+      ) : (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
