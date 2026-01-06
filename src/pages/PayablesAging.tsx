@@ -11,6 +11,10 @@ import {
   AlertTriangle,
   DollarSign,
   CreditCard,
+  Eye,
+  Pencil,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +44,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CreateSupplierInvoiceDialog } from "@/components/suppliers/CreateSupplierInvoiceDialog";
+import { ViewSupplierInvoiceDialog } from "@/components/suppliers/ViewSupplierInvoiceDialog";
+import { EditSupplierInvoiceDialog } from "@/components/suppliers/EditSupplierInvoiceDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface AgingBucket {
   current: number;
@@ -84,6 +108,12 @@ const PayablesAging = () => {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState<PaymentForm>(emptyPaymentForm);
   const [selectedInvoice, setSelectedInvoice] = useState<SupplierInvoice | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<SupplierInvoice | null>(null);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["supplier-invoices-aging"],
@@ -119,6 +149,25 @@ const PayablesAging = () => {
     },
     onError: () => {
       toast.error("Failed to record payment");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const { error } = await supabase
+        .from("supplier_invoices")
+        .delete()
+        .eq("id", invoiceId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supplier-invoices-aging"] });
+      setDeleteDialogOpen(false);
+      setInvoiceToDelete(null);
+      toast.success("Invoice deleted");
+    },
+    onError: () => {
+      toast.error("Failed to delete invoice");
     },
   });
 
@@ -183,6 +232,27 @@ const PayablesAging = () => {
     paymentMutation.mutate(paymentForm);
   };
 
+  const handleViewInvoice = (invoiceId: string) => {
+    setSelectedInvoiceId(invoiceId);
+    setViewDialogOpen(true);
+  };
+
+  const handleEditInvoice = (invoiceId: string) => {
+    setSelectedInvoiceId(invoiceId);
+    setEditDialogOpen(true);
+  };
+
+  const handleDeleteInvoice = (invoice: SupplierInvoice) => {
+    setInvoiceToDelete(invoice);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (invoiceToDelete) {
+      deleteMutation.mutate(invoiceToDelete.id);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -192,6 +262,10 @@ const PayablesAging = () => {
             Track outstanding supplier invoices by age
           </p>
         </div>
+        <Button onClick={() => setCreateDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Invoice
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-5">
@@ -338,14 +412,39 @@ const PayablesAging = () => {
                           <Badge variant={aging.variant}>{aging.label}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRecordPayment(invoice)}
-                          >
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            Pay
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewInvoice(invoice.id)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditInvoice(invoice.id)}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Invoice
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleRecordPayment(invoice)}>
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                Record Payment
+                              </DropdownMenuItem>
+                              {Number(invoice.paid_amount) === 0 && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteInvoice(invoice)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Invoice
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     );
@@ -428,6 +527,43 @@ const PayablesAging = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CreateSupplierInvoiceDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
+
+      <ViewSupplierInvoiceDialog
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+        invoiceId={selectedInvoiceId}
+      />
+
+      <EditSupplierInvoiceDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        invoiceId={selectedInvoiceId}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete invoice {invoiceToDelete?.invoice_number}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
