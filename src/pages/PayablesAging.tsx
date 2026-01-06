@@ -11,6 +11,9 @@ import {
   AlertTriangle,
   DollarSign,
   CreditCard,
+  Eye,
+  Pencil,
+  MoreHorizontal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +44,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CreateSupplierInvoiceDialog } from "@/components/suppliers/CreateSupplierInvoiceDialog";
+import { ViewSupplierInvoiceDialog } from "@/components/suppliers/ViewSupplierInvoiceDialog";
+import { EditSupplierInvoiceDialog } from "@/components/suppliers/EditSupplierInvoiceDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface AgingBucket {
   current: number;
@@ -86,6 +97,9 @@ const PayablesAging = () => {
   const [paymentForm, setPaymentForm] = useState<PaymentForm>(emptyPaymentForm);
   const [selectedInvoice, setSelectedInvoice] = useState<SupplierInvoice | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["supplier-invoices-aging"],
@@ -183,6 +197,16 @@ const PayablesAging = () => {
       return;
     }
     paymentMutation.mutate(paymentForm);
+  };
+
+  const handleViewInvoice = (invoiceId: string) => {
+    setSelectedInvoiceId(invoiceId);
+    setViewDialogOpen(true);
+  };
+
+  const handleEditInvoice = (invoiceId: string) => {
+    setSelectedInvoiceId(invoiceId);
+    setEditDialogOpen(true);
   };
 
   return (
@@ -344,14 +368,27 @@ const PayablesAging = () => {
                           <Badge variant={aging.variant}>{aging.label}</Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleRecordPayment(invoice)}
-                          >
-                            <CreditCard className="h-4 w-4 mr-1" />
-                            Pay
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewInvoice(invoice.id)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleEditInvoice(invoice.id)}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Edit Invoice
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleRecordPayment(invoice)}>
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                Record Payment
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     );
@@ -438,6 +475,18 @@ const PayablesAging = () => {
       <CreateSupplierInvoiceDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
+      />
+
+      <ViewSupplierInvoiceDialog
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+        invoiceId={selectedInvoiceId}
+      />
+
+      <EditSupplierInvoiceDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        invoiceId={selectedInvoiceId}
       />
     </div>
   );
