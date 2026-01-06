@@ -30,6 +30,7 @@ import { ReceiptDialog } from "@/components/pos/ReceiptDialog";
 import { CustomerSelectDialog } from "@/components/pos/CustomerSelectDialog";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { OpenDrawerDialog } from "@/components/cash-drawer/OpenDrawerDialog";
+import { RefundDialog } from "@/components/pos/RefundDialog";
 import { useCashDrawer } from "@/hooks/useCashDrawer";
 import { Link } from "react-router-dom";
 
@@ -93,6 +94,7 @@ export default function POS() {
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [heldOrdersOpen, setHeldOrdersOpen] = useState(false);
   const [openDrawerDialogOpen, setOpenDrawerDialogOpen] = useState(false);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
   
   // Last completed sale for receipt
   const [lastSale, setLastSale] = useState<{
@@ -241,6 +243,27 @@ export default function POS() {
     setSelectedCustomer(null);
     
     toast.success("Sale completed successfully!");
+  };
+
+  const handleRefundComplete = async (refundData: {
+    invoiceNumber: string;
+    amount: number;
+    reason: string;
+    paymentMethod: string;
+  }) => {
+    // Record cash refund to drawer if cash payment and drawer is open
+    if (refundData.paymentMethod === "cash" && hasActiveDrawer) {
+      try {
+        await recordRefund({
+          amount: refundData.amount,
+          invoiceNumber: refundData.invoiceNumber,
+        });
+      } catch (error) {
+        console.error("Failed to record refund to drawer:", error);
+      }
+    }
+    
+    toast.success(`Refund of $${refundData.amount.toFixed(2)} processed for ${refundData.invoiceNumber}`);
   };
 
   const filteredProducts = sampleProducts.filter(
@@ -536,7 +559,7 @@ export default function POS() {
             <CheckCircle className="h-5 w-5" />
             Pay ${total.toFixed(2)} (F4)
           </Button>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <Button 
               variant="outline" 
               size="sm" 
@@ -546,6 +569,15 @@ export default function POS() {
             >
               <Pause className="h-4 w-4" />
               Hold
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1 text-destructive hover:text-destructive"
+              onClick={() => setRefundDialogOpen(true)}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Refund
             </Button>
             <Button 
               variant="outline" 
@@ -606,6 +638,13 @@ export default function POS() {
       <OpenDrawerDialog
         open={openDrawerDialogOpen}
         onOpenChange={setOpenDrawerDialogOpen}
+      />
+
+      <RefundDialog
+        open={refundDialogOpen}
+        onClose={() => setRefundDialogOpen(false)}
+        onComplete={handleRefundComplete}
+        hasActiveDrawer={hasActiveDrawer}
       />
 
       {/* Held Orders Dialog */}
