@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -15,8 +15,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, TrendingUp, TrendingDown, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { z } from "zod";
 
 const closeDrawerSchema = z.object({
@@ -44,6 +45,39 @@ export function CloseDrawerDialog({
   const queryClient = useQueryClient();
   const [actualClosing, setActualClosing] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
+
+  // Fetch transactions for this drawer
+  const { data: transactions = [] } = useQuery({
+    queryKey: ["drawer-transactions-summary", drawer.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("cash_transactions")
+        .select("*")
+        .eq("drawer_id", drawer.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  // Calculate summaries
+  const salesTotal = transactions
+    .filter(t => t.transaction_type === "sale")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+  
+  const refundsTotal = transactions
+    .filter(t => t.transaction_type === "refund")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+  
+  const cashInTotal = transactions
+    .filter(t => t.transaction_type === "cash_in")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+  
+  const cashOutTotal = transactions
+    .filter(t => t.transaction_type === "cash_out")
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const transactionCount = transactions.length;
 
   const actualAmount = parseFloat(actualClosing) || 0;
   const variance = actualAmount - expectedBalance;
@@ -96,10 +130,51 @@ export function CloseDrawerDialog({
         <DialogHeader>
           <DialogTitle>Close Cash Drawer</DialogTitle>
           <DialogDescription>
-            Count the cash and enter the actual closing amount for reconciliation.
+            Review the day's summary and enter the actual closing amount.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto">
+          {/* Day's Summary */}
+          <div className="space-y-3">
+            <h4 className="font-medium text-sm">Day's Summary</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2 p-3 bg-emerald-500/10 rounded-lg">
+                <TrendingUp className="h-4 w-4 text-emerald-600" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Sales</p>
+                  <p className="font-semibold text-emerald-600">${salesTotal.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-red-500/10 rounded-lg">
+                <TrendingDown className="h-4 w-4 text-red-600" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Refunds</p>
+                  <p className="font-semibold text-red-600">${refundsTotal.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-blue-500/10 rounded-lg">
+                <ArrowUpCircle className="h-4 w-4 text-blue-600" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Cash In</p>
+                  <p className="font-semibold text-blue-600">${cashInTotal.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-3 bg-orange-500/10 rounded-lg">
+                <ArrowDownCircle className="h-4 w-4 text-orange-600" />
+                <div>
+                  <p className="text-xs text-muted-foreground">Cash Out</p>
+                  <p className="font-semibold text-orange-600">${cashOutTotal.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground text-center">
+              {transactionCount} transaction{transactionCount !== 1 ? 's' : ''} today
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Balance Calculation */}
           <div className="bg-muted p-4 rounded-lg space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Opening Float:</span>
