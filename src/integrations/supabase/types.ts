@@ -684,6 +684,7 @@ export type Database = {
           id: string
           notes: string | null
           receipt_reference: string | null
+          receipt_url: string | null
           status: string
           updated_at: string
         }
@@ -700,6 +701,7 @@ export type Database = {
           id?: string
           notes?: string | null
           receipt_reference?: string | null
+          receipt_url?: string | null
           status?: string
           updated_at?: string
         }
@@ -716,12 +718,57 @@ export type Database = {
           id?: string
           notes?: string | null
           receipt_reference?: string | null
+          receipt_url?: string | null
           status?: string
           updated_at?: string
         }
         Relationships: [
           {
             foreignKeyName: "petty_cash_expenses_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      petty_cash_funds: {
+        Row: {
+          amount: number
+          balance_after: number
+          branch_id: string
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          reference_id: string | null
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          branch_id: string
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          branch_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          reference_id?: string | null
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "petty_cash_funds_branch_id_fkey"
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"

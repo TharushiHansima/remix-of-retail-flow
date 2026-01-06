@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { ExternalLink } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -7,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 
 interface PettyCashExpense {
   id: string;
@@ -16,6 +18,7 @@ interface PettyCashExpense {
   description: string;
   amount: number;
   receipt_reference: string | null;
+  receipt_url?: string | null;
   created_by: string;
   approved_by: string | null;
   approved_at: string | null;
@@ -80,6 +83,28 @@ export function ViewPettyCashDialog({
             <p className="text-sm text-muted-foreground">Description</p>
             <p className="mt-1">{expense.description}</p>
           </div>
+
+          {expense.receipt_url && (
+            <div>
+              <p className="text-sm text-muted-foreground mb-2">Receipt Image</p>
+              <div className="relative rounded-lg overflow-hidden border bg-muted/50">
+                <img
+                  src={expense.receipt_url}
+                  alt="Receipt"
+                  className="w-full h-40 object-cover"
+                />
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="absolute bottom-2 right-2"
+                  onClick={() => window.open(expense.receipt_url!, "_blank")}
+                >
+                  <ExternalLink className="h-3 w-3 mr-1" />
+                  View Full
+                </Button>
+              </div>
+            </div>
+          )}
 
           {expense.receipt_reference && (
             <div>
