@@ -18,13 +18,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import type { UpdateProductDto } from "@/features/inventory/products/products.types";
+
+type Option = { id: string; name: string };
 
 interface Product {
   id: string;
   sku: string;
   name: string;
   category: string;
+  categoryId?: string | null;
   brand: string;
+  brandId?: string | null;
   type: "standard" | "serialized" | "batch";
   price: number;
   wholesalePrice?: number;
@@ -41,15 +46,31 @@ interface EditProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
+  categories: Option[];
+  brands: Option[];
+  onSubmit: (id: string, dto: UpdateProductDto) => Promise<boolean>;
 }
 
-export function EditProductDialog({ open, onOpenChange, product }: EditProductDialogProps) {
+function toOptionalNumber(value: string) {
+  if (!value.trim()) return undefined;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+}
+
+export function EditProductDialog({
+  open,
+  onOpenChange,
+  product,
+  categories,
+  brands,
+  onSubmit,
+}: EditProductDialogProps) {
   const [formData, setFormData] = useState({
     sku: "",
     name: "",
     description: "",
-    category: "",
-    brand: "",
+    categoryId: "none",
+    brandId: "none",
     unitPrice: "",
     wholesalePrice: "",
     costPrice: "",
@@ -60,32 +81,58 @@ export function EditProductDialog({ open, onOpenChange, product }: EditProductDi
     isBatched: false,
     isActive: true,
   });
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (product) {
-      setFormData({
-        sku: product.sku,
-        name: product.name,
-        description: "",
-        category: product.category.toLowerCase(),
-        brand: product.brand.toLowerCase(),
-        unitPrice: product.price.toString(),
-        wholesalePrice: product.wholesalePrice?.toString() || "0",
-        costPrice: product.cost.toString(),
-        minStockLevel: "0",
-        maxStockLevel: "100",
-        reorderQuantity: "10",
-        isSerialized: product.type === "serialized",
-        isBatched: product.type === "batch",
-        isActive: product.status === "active",
-      });
-    }
-  }, [product]);
+    if (!product || !open) return;
+    setFormData({
+      sku: product.sku,
+      name: product.name,
+      description: "",
+      categoryId: product.categoryId || "none",
+      brandId: product.brandId || "none",
+      unitPrice: product.price.toString(),
+      wholesalePrice: product.wholesalePrice?.toString() || "0",
+      costPrice: product.cost.toString(),
+      minStockLevel: "0",
+      maxStockLevel: "100",
+      reorderQuantity: "10",
+      isSerialized: product.type === "serialized",
+      isBatched: product.type === "batch",
+      isActive: product.status === "active",
+    });
+  }, [product, open]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Updating product:", formData);
-    onOpenChange(false);
+    if (!product) return;
+    setSubmitting(true);
+
+    const dto: UpdateProductDto = {
+      name: formData.name.trim(),
+      sku: formData.sku.trim(),
+      isSerialized: formData.isSerialized,
+      isBatched: formData.isBatched,
+    };
+
+    if (formData.categoryId !== "none") dto.categoryId = formData.categoryId;
+    if (formData.brandId !== "none") dto.brandId = formData.brandId;
+
+    const unitPrice = toOptionalNumber(formData.unitPrice);
+    if (unitPrice !== undefined) {
+      dto.unitPrice = unitPrice;
+      dto.sellingPrice = unitPrice;
+    }
+
+    const costPrice = toOptionalNumber(formData.costPrice);
+    if (costPrice !== undefined) dto.costPrice = costPrice;
+
+    try {
+      const ok = await onSubmit(product.id, dto);
+      if (ok) onOpenChange(false);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!product) return null;
@@ -138,34 +185,38 @@ export function EditProductDialog({ open, onOpenChange, product }: EditProductDi
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  value={formData.categoryId}
+                  onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
-                    <SelectItem value="smartphones">Smartphones</SelectItem>
-                    <SelectItem value="laptops">Laptops</SelectItem>
-                    <SelectItem value="tablets">Tablets</SelectItem>
-                    <SelectItem value="accessories">Accessories</SelectItem>
+                    <SelectItem value="none">No category</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="brand">Brand</Label>
                 <Select
-                  value={formData.brand}
-                  onValueChange={(value) => setFormData({ ...formData, brand: value })}
+                  value={formData.brandId}
+                  onValueChange={(value) => setFormData({ ...formData, brandId: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
-                    <SelectItem value="apple">Apple</SelectItem>
-                    <SelectItem value="samsung">Samsung</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="generic">Generic</SelectItem>
+                    <SelectItem value="none">No brand</SelectItem>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        {brand.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -289,10 +340,12 @@ export function EditProductDialog({ open, onOpenChange, product }: EditProductDi
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit">Save Changes</Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Saving..." : "Save Changes"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

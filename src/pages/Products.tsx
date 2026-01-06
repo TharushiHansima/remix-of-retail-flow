@@ -1,4 +1,5 @@
-import { useState } from "react";
+// product.tsx
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
@@ -40,13 +41,33 @@ import { AddProductDialog } from "@/components/products/AddProductDialog";
 import { ViewProductDialog } from "@/components/products/ViewProductDialog";
 import { EditProductDialog } from "@/components/products/EditProductDialog";
 import { DeleteProductDialog } from "@/components/products/DeleteProductDialog";
+import { toast } from "sonner";
+import {
+  createProduct,
+  disableProduct,
+  listProducts,
+  updateProduct,
+} from "@/features/inventory/products/products.api";
+import type {
+  CreateProductDto,
+  Product as ApiProduct,
+  ProductListResponse,
+  UpdateProductDto,
+} from "@/features/inventory/products/products.types";
+import { useCategories } from "@/features/inventory/categories/categories.hooks";
+import { useBrands } from "@/features/inventory/brands/useBrands";
 
+/* =========================
+   UI Types (same UI)
+   ========================= */
 interface Product {
   id: string;
   sku: string;
   name: string;
   category: string;
+  categoryId?: string | null;
   brand: string;
+  brandId?: string | null;
   type: "standard" | "serialized" | "batch";
   price: number;
   cost: number;
@@ -57,297 +78,6 @@ interface Product {
   };
   status: "active" | "inactive" | "low_stock";
 }
-
-const products: Product[] = [
-  {
-    id: "1",
-    sku: "APL-IP15PM-256",
-    name: "iPhone 15 Pro Max 256GB",
-    category: "Smartphones",
-    brand: "Apple",
-    type: "serialized",
-    price: 1199,
-    cost: 950,
-    stock: { main: 5, downtown: 3, warehouse: 12 },
-    status: "active",
-  },
-  {
-    id: "2",
-    sku: "SAM-S24U-256",
-    name: "Samsung Galaxy S24 Ultra",
-    category: "Smartphones",
-    brand: "Samsung",
-    type: "serialized",
-    price: 1099,
-    cost: 850,
-    stock: { main: 8, downtown: 5, warehouse: 15 },
-    status: "active",
-  },
-  {
-    id: "3",
-    sku: "APL-MBP14-M3",
-    name: "MacBook Pro 14\" M3",
-    category: "Laptops",
-    brand: "Apple",
-    type: "serialized",
-    price: 1999,
-    cost: 1600,
-    stock: { main: 2, downtown: 1, warehouse: 5 },
-    status: "low_stock",
-  },
-  {
-    id: "4",
-    sku: "APL-APP2",
-    name: "AirPods Pro 2nd Gen",
-    category: "Accessories",
-    brand: "Apple",
-    type: "standard",
-    price: 249,
-    cost: 180,
-    stock: { main: 15, downtown: 10, warehouse: 30 },
-    status: "active",
-  },
-  {
-    id: "5",
-    sku: "ACC-USBC-65W",
-    name: "USB-C Fast Charger 65W",
-    category: "Accessories",
-    brand: "Generic",
-    type: "batch",
-    price: 45,
-    cost: 22,
-    stock: { main: 25, downtown: 20, warehouse: 100 },
-    status: "active",
-  },
-  {
-    id: "6",
-    sku: "SAM-TAB-S9",
-    name: "Samsung Galaxy Tab S9",
-    category: "Tablets",
-    brand: "Samsung",
-    type: "serialized",
-    price: 849,
-    cost: 650,
-    stock: { main: 0, downtown: 0, warehouse: 2 },
-    status: "low_stock",
-  },
-  {
-    id: "7",
-    sku: "APL-WATCH-S9",
-    name: "Apple Watch Series 9",
-    category: "Wearables",
-    brand: "Apple",
-    type: "serialized",
-    price: 449,
-    cost: 349,
-    stock: { main: 12, downtown: 8, warehouse: 20 },
-    status: "active",
-  },
-  {
-    id: "8",
-    sku: "GOO-PIX8-PRO",
-    name: "Google Pixel 8 Pro",
-    category: "Smartphones",
-    brand: "Google",
-    type: "serialized",
-    price: 999,
-    cost: 799,
-    stock: { main: 6, downtown: 4, warehouse: 10 },
-    status: "active",
-  },
-  {
-    id: "9",
-    sku: "SONY-WH1000",
-    name: "Sony WH-1000XM5 Headphones",
-    category: "Audio",
-    brand: "Sony",
-    type: "serialized",
-    price: 399,
-    cost: 299,
-    stock: { main: 10, downtown: 7, warehouse: 25 },
-    status: "active",
-  },
-  {
-    id: "10",
-    sku: "SAM-BUDS-PRO2",
-    name: "Samsung Galaxy Buds2 Pro",
-    category: "Audio",
-    brand: "Samsung",
-    type: "standard",
-    price: 229,
-    cost: 149,
-    stock: { main: 18, downtown: 12, warehouse: 40 },
-    status: "active",
-  },
-  {
-    id: "11",
-    sku: "APL-AIRMAX",
-    name: "AirPods Max",
-    category: "Audio",
-    brand: "Apple",
-    type: "serialized",
-    price: 549,
-    cost: 449,
-    stock: { main: 3, downtown: 2, warehouse: 8 },
-    status: "active",
-  },
-  {
-    id: "12",
-    sku: "DEL-XPS15-I7",
-    name: "Dell XPS 15 i7",
-    category: "Laptops",
-    brand: "Dell",
-    type: "serialized",
-    price: 1599,
-    cost: 1299,
-    stock: { main: 4, downtown: 2, warehouse: 6 },
-    status: "active",
-  },
-  {
-    id: "13",
-    sku: "LEN-THINK-T14",
-    name: "Lenovo ThinkPad T14",
-    category: "Laptops",
-    brand: "Lenovo",
-    type: "serialized",
-    price: 1199,
-    cost: 899,
-    stock: { main: 5, downtown: 3, warehouse: 9 },
-    status: "active",
-  },
-  {
-    id: "14",
-    sku: "LOG-MX-M3S",
-    name: "Logitech MX Master 3S",
-    category: "Accessories",
-    brand: "Logitech",
-    type: "standard",
-    price: 99,
-    cost: 69,
-    stock: { main: 22, downtown: 15, warehouse: 50 },
-    status: "active",
-  },
-  {
-    id: "15",
-    sku: "KEY-K2-V2",
-    name: "Keychron K2 V2 Keyboard",
-    category: "Accessories",
-    brand: "Keychron",
-    type: "standard",
-    price: 89,
-    cost: 59,
-    stock: { main: 8, downtown: 5, warehouse: 20 },
-    status: "active",
-  },
-  {
-    id: "16",
-    sku: "ANK-PWR-20K",
-    name: "Anker PowerCore 20000mAh",
-    category: "Accessories",
-    brand: "Anker",
-    type: "batch",
-    price: 59,
-    cost: 35,
-    stock: { main: 30, downtown: 20, warehouse: 80 },
-    status: "active",
-  },
-  {
-    id: "17",
-    sku: "TPL-WIFI6-AX",
-    name: "TP-Link Archer AX50 WiFi 6",
-    category: "Networking",
-    brand: "TP-Link",
-    type: "standard",
-    price: 129,
-    cost: 89,
-    stock: { main: 7, downtown: 5, warehouse: 15 },
-    status: "active",
-  },
-  {
-    id: "18",
-    sku: "SAM-T7-1TB",
-    name: "Samsung T7 SSD 1TB",
-    category: "Storage",
-    brand: "Samsung",
-    type: "serialized",
-    price: 149,
-    cost: 99,
-    stock: { main: 15, downtown: 10, warehouse: 35 },
-    status: "active",
-  },
-  {
-    id: "19",
-    sku: "LOG-C920-HD",
-    name: "Logitech C920 HD Webcam",
-    category: "Accessories",
-    brand: "Logitech",
-    type: "standard",
-    price: 79,
-    cost: 49,
-    stock: { main: 12, downtown: 8, warehouse: 25 },
-    status: "active",
-  },
-  {
-    id: "20",
-    sku: "APL-MAGSAFE",
-    name: "Apple MagSafe Charger",
-    category: "Chargers",
-    brand: "Apple",
-    type: "standard",
-    price: 49,
-    cost: 29,
-    stock: { main: 35, downtown: 25, warehouse: 100 },
-    status: "active",
-  },
-  {
-    id: "21",
-    sku: "ONP-12-256",
-    name: "OnePlus 12 256GB",
-    category: "Smartphones",
-    brand: "OnePlus",
-    type: "serialized",
-    price: 899,
-    cost: 699,
-    stock: { main: 0, downtown: 1, warehouse: 3 },
-    status: "low_stock",
-  },
-  {
-    id: "22",
-    sku: "NIN-SWITCH-O",
-    name: "Nintendo Switch OLED",
-    category: "Gaming",
-    brand: "Nintendo",
-    type: "serialized",
-    price: 349,
-    cost: 279,
-    stock: { main: 6, downtown: 4, warehouse: 12 },
-    status: "active",
-  },
-  {
-    id: "23",
-    sku: "IPAD-AIR-M2",
-    name: "iPad Air M2 256GB",
-    category: "Tablets",
-    brand: "Apple",
-    type: "serialized",
-    price: 699,
-    cost: 549,
-    stock: { main: 8, downtown: 5, warehouse: 15 },
-    status: "active",
-  },
-  {
-    id: "24",
-    sku: "BOSE-QC45",
-    name: "Bose QuietComfort 45",
-    category: "Audio",
-    brand: "Bose",
-    type: "serialized",
-    price: 329,
-    cost: 249,
-    stock: { main: 7, downtown: 5, warehouse: 18 },
-    status: "active",
-  },
-];
 
 const typeLabels = {
   standard: "Standard",
@@ -361,14 +91,154 @@ const statusColors = {
   low_stock: "bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))]",
 };
 
+type StatusFilter = "all" | "active" | "inactive" | "low_stock";
+
+function toNumber(v: unknown): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function mapApiProductToUi(
+  p: ApiProduct,
+  lookups: { brandById: Map<string, string>; categoryById: Map<string, string> },
+): Product {
+  const isSerialized = !!p.isSerialized;
+  const isBatched = !!p.isBatched;
+
+  const type: Product["type"] = isSerialized ? "serialized" : isBatched ? "batch" : "standard";
+
+  const brandId = p.brand?.id || p.brandId || null;
+  const brand =
+    p.brand?.name ||
+    p.brandName ||
+    (brandId ? lookups.brandById.get(brandId) : undefined) ||
+    "-";
+
+  const categoryId = p.category?.id || p.categoryId || null;
+  const category =
+    p.category?.name ||
+    p.categoryName ||
+    (categoryId ? lookups.categoryById.get(categoryId) : undefined) ||
+    "-";
+
+  const status: Product["status"] = p.isActive === false ? "inactive" : "active";
+
+  return {
+    id: p.id,
+    sku: (p.sku || "-").toString(),
+    name: p.name,
+    category,
+    categoryId,
+    brand,
+    brandId,
+    type,
+    price: toNumber(p.unitPrice ?? p.sellingPrice),
+    cost: toNumber(p.costPrice),
+    // stock is not provided by this controller; keep zeros for now
+    stock: { main: 0, downtown: 0, warehouse: 0 },
+    // low_stock requires stock module; keep active/inactive only
+    status,
+  };
+}
+
+function normalizeListResponse(res: ProductListResponse): { items: ApiProduct[]; total: number } {
+  if (Array.isArray(res)) return { items: res, total: res.length };
+  return { items: res.items || [], total: res.total ?? res.items?.length ?? 0 };
+}
+
 export default function Products() {
+  const { categories } = useCategories();
+  const { brands } = useBrands();
+
+  const brandById = useMemo(() => new Map(brands.map((brand) => [brand.id, brand.name])), [brands]);
+  const categoryById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category.name])),
+    [categories],
+  );
+
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [brandFilter, setBrandFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  // ✅ backend data
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const applyProducts = useCallback((mapped: Product[]) => {
+    setProducts(mapped);
+    const ids = new Set(mapped.map((p) => p.id));
+    setSelectedProducts((prev) => prev.filter((id) => ids.has(id)));
+  }, []);
+
+  const fetchAndMapProducts = useCallback(async () => {
+    const isActive =
+      statusFilter === "active" ? true : statusFilter === "inactive" ? false : undefined;
+
+    const res = await listProducts({
+      q: searchQuery.trim() ? searchQuery.trim() : undefined,
+      brandId: brandFilter !== "all" ? brandFilter : undefined,
+      categoryId: categoryFilter !== "all" ? categoryFilter : undefined,
+      isActive,
+      page: 1,
+      pageSize: 100,
+    });
+
+    const { items } = normalizeListResponse(res);
+    return items.map((item) => mapApiProductToUi(item, { brandById, categoryById }));
+  }, [searchQuery, brandFilter, categoryFilter, statusFilter, brandById, categoryById]);
+
+  const reloadProducts = useCallback(async () => {
+    try {
+      setLoading(true);
+      const mapped = await fetchAndMapProducts();
+      applyProducts(mapped);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to load products");
+      applyProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchAndMapProducts, applyProducts]);
+
+  // load products from backend (debounced by searchQuery/filters)
+  useEffect(() => {
+    let alive = true;
+
+    const t = setTimeout(() => {
+      void (async () => {
+        try {
+          setLoading(true);
+          const mapped = await fetchAndMapProducts();
+          if (!alive) return;
+          applyProducts(mapped);
+        } catch (e: any) {
+          if (!alive) return;
+          toast.error(e?.message || "Failed to load products");
+          applyProducts([]);
+        } finally {
+          if (alive) setLoading(false);
+        }
+      })();
+    }, 250);
+
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [fetchAndMapProducts, applyProducts]);
 
   const toggleSelect = (id: string) => {
     setSelectedProducts((prev) =>
@@ -382,10 +252,66 @@ export default function Products() {
     );
   };
 
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchQuery.toLowerCase())
+  // Keep your existing local filtering behavior (works even if backend already filtered)
+  const filteredProducts = useMemo(() => {
+    let result = products;
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      result = result.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.sku.toLowerCase().includes(q)
+      );
+    }
+    if (statusFilter !== "all") {
+      result = result.filter((p) => p.status === statusFilter);
+    }
+    return result;
+  }, [products, searchQuery, statusFilter]);
+
+  const handleCreateProduct = useCallback(
+    async (dto: CreateProductDto) => {
+      try {
+        await createProduct(dto);
+        toast.success("Product added successfully");
+        await reloadProducts();
+        return true;
+      } catch (e: any) {
+        toast.error(e?.message || "Failed to add product");
+        return false;
+      }
+    },
+    [reloadProducts],
+  );
+
+  const handleUpdateProduct = useCallback(
+    async (id: string, dto: UpdateProductDto) => {
+      try {
+        await updateProduct(id, dto);
+        toast.success("Product updated successfully");
+        await reloadProducts();
+        return true;
+      } catch (e: any) {
+        toast.error(e?.message || "Failed to update product");
+        return false;
+      }
+    },
+    [reloadProducts],
+  );
+
+  const handleDisableProduct = useCallback(
+    async (id: string) => {
+      try {
+        await disableProduct(id);
+        toast.success("Product disabled successfully");
+        await reloadProducts();
+        return true;
+      } catch (e: any) {
+        toast.error(e?.message || "Failed to disable product");
+        return false;
+      }
+    },
+    [reloadProducts],
   );
 
   const handleView = (product: Product) => {
@@ -438,30 +364,36 @@ export default function Products() {
             className="pl-10"
           />
         </div>
-        <Select>
+
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent className="bg-popover">
             <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="smartphones">Smartphones</SelectItem>
-            <SelectItem value="laptops">Laptops</SelectItem>
-            <SelectItem value="tablets">Tablets</SelectItem>
-            <SelectItem value="accessories">Accessories</SelectItem>
+            {categories.map((category) => (
+              <SelectItem key={category.id} value={category.id}>
+                {category.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        <Select>
+
+        <Select value={brandFilter} onValueChange={setBrandFilter}>
           <SelectTrigger className="w-32">
             <SelectValue placeholder="Brand" />
           </SelectTrigger>
           <SelectContent className="bg-popover">
             <SelectItem value="all">All Brands</SelectItem>
-            <SelectItem value="apple">Apple</SelectItem>
-            <SelectItem value="samsung">Samsung</SelectItem>
-            <SelectItem value="generic">Generic</SelectItem>
+            {brands.map((brand) => (
+              <SelectItem key={brand.id} value={brand.id}>
+                {brand.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
-        <Select>
+
+        <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)}>
           <SelectTrigger className="w-32">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -472,6 +404,7 @@ export default function Products() {
             <SelectItem value="low_stock">Low Stock</SelectItem>
           </SelectContent>
         </Select>
+
         <Button variant="outline" size="icon">
           <Filter className="h-4 w-4" />
         </Button>
@@ -502,8 +435,8 @@ export default function Products() {
             <TableRow className="bg-muted/50">
               <TableHead className="w-12">
                 <Checkbox
-                  checked={selectedProducts.length === products.length}
-                  onCheckedChange={toggleSelectAll}
+                  checked={products.length > 0 && selectedProducts.length === products.length}
+                  onCheckedChange={() => toggleSelectAll()}
                 />
               </TableHead>
               <TableHead>SKU</TableHead>
@@ -516,75 +449,86 @@ export default function Products() {
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
-            {filteredProducts.map((product) => (
-              <TableRow key={product.id} className="hover:bg-muted/30">
-                <TableCell>
-                  <Checkbox
-                    checked={selectedProducts.includes(product.id)}
-                    onCheckedChange={() => toggleSelect(product.id)}
-                  />
-                </TableCell>
-                <TableCell className="font-mono text-sm">{product.sku}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                      <Package className="h-5 w-5 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">{product.brand}</p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>{product.category}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{typeLabels[product.type]}</Badge>
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  ${product.price.toFixed(2)}
-                </TableCell>
-                <TableCell className="text-center font-mono text-sm">
-                  {product.stock.main} / {product.stock.downtown} / {product.stock.warehouse}
-                </TableCell>
-                <TableCell>
-                  <Badge className={statusColors[product.status]}>
-                    {product.status === "low_stock" ? "Low Stock" : product.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-popover">
-                      <DropdownMenuItem onClick={() => handleView(product)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEdit(product)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Product
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        className="text-destructive"
-                        onClick={() => handleDelete(product)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={9}>Loading...</TableCell>
               </TableRow>
-            ))}
+            ) : filteredProducts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9}>No products found</TableCell>
+              </TableRow>
+            ) : (
+              filteredProducts.map((product) => (
+                <TableRow key={product.id} className="hover:bg-muted/30">
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedProducts.includes(product.id)}
+                      onCheckedChange={() => toggleSelect(product.id)}
+                    />
+                  </TableCell>
+                  <TableCell className="font-mono text-sm">{product.sku}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                        <Package className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{product.name}</p>
+                        <p className="text-xs text-muted-foreground">{product.brand}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>{product.category}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{typeLabels[product.type]}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    ${product.price.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-center font-mono text-sm">
+                    {product.stock.main} / {product.stock.downtown} / {product.stock.warehouse}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={statusColors[product.status]}>
+                      {product.status === "low_stock" ? "Low Stock" : product.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-popover">
+                        <DropdownMenuItem onClick={() => handleView(product)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(product)}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit Product
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDelete(product)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination (UI unchanged; backend paging can be added later) */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           Showing 1-{filteredProducts.length} of {filteredProducts.length} products
@@ -603,21 +547,31 @@ export default function Products() {
       </div>
 
       {/* Dialogs */}
-      <AddProductDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
-      <ViewProductDialog 
-        open={viewDialogOpen} 
-        onOpenChange={setViewDialogOpen} 
-        product={selectedProduct} 
+      <AddProductDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        categories={categories}
+        brands={brands}
+        onSubmit={handleCreateProduct}
       />
-      <EditProductDialog 
-        open={editDialogOpen} 
-        onOpenChange={setEditDialogOpen} 
-        product={selectedProduct} 
+      <ViewProductDialog
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+        product={selectedProduct}
       />
-      <DeleteProductDialog 
-        open={deleteDialogOpen} 
-        onOpenChange={setDeleteDialogOpen} 
-        product={selectedProduct} 
+      <EditProductDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        product={selectedProduct}
+        categories={categories}
+        brands={brands}
+        onSubmit={handleUpdateProduct}
+      />
+      <DeleteProductDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        product={selectedProduct}
+        onConfirm={handleDisableProduct}
       />
     </div>
   );

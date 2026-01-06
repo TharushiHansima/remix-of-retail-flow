@@ -18,35 +18,85 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import type { CreateProductDto } from "@/features/inventory/products/products.types";
+
+type Option = { id: string; name: string };
 
 interface AddProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  categories: Option[];
+  brands: Option[];
+  onSubmit: (dto: CreateProductDto) => Promise<boolean>;
 }
 
-export function AddProductDialog({ open, onOpenChange }: AddProductDialogProps) {
-  const [formData, setFormData] = useState({
-    sku: "",
-    name: "",
-    description: "",
-    category: "",
-    brand: "",
-    type: "standard",
-    unitPrice: "",
-    wholesalePrice: "",
-    costPrice: "",
-    minStockLevel: "",
-    maxStockLevel: "",
-    reorderQuantity: "",
-    isSerialized: false,
-    isBatched: false,
-    isActive: true,
-  });
+function toOptionalNumber(value: string) {
+  if (!value.trim()) return undefined;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : undefined;
+}
 
-  const handleSubmit = (e: React.FormEvent) => {
+const emptyForm = {
+  sku: "",
+  name: "",
+  description: "",
+  categoryId: "none",
+  brandId: "none",
+  unitPrice: "",
+  wholesalePrice: "",
+  costPrice: "",
+  minStockLevel: "",
+  maxStockLevel: "",
+  reorderQuantity: "",
+  isSerialized: false,
+  isBatched: false,
+  isActive: true,
+};
+
+export function AddProductDialog({
+  open,
+  onOpenChange,
+  categories,
+  brands,
+  onSubmit,
+}: AddProductDialogProps) {
+  const [formData, setFormData] = useState({
+    ...emptyForm,
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Adding product:", formData);
-    onOpenChange(false);
+    setSubmitting(true);
+
+    const dto: CreateProductDto = {
+      name: formData.name.trim(),
+      sku: formData.sku.trim(),
+      isSerialized: formData.isSerialized,
+      isBatched: formData.isBatched,
+    };
+
+    if (formData.categoryId !== "none") dto.categoryId = formData.categoryId;
+    if (formData.brandId !== "none") dto.brandId = formData.brandId;
+
+    const unitPrice = toOptionalNumber(formData.unitPrice);
+    if (unitPrice !== undefined) {
+      dto.unitPrice = unitPrice;
+      dto.sellingPrice = unitPrice;
+    }
+
+    const costPrice = toOptionalNumber(formData.costPrice);
+    if (costPrice !== undefined) dto.costPrice = costPrice;
+
+    try {
+      const ok = await onSubmit(dto);
+      if (ok) {
+        setFormData({ ...emptyForm });
+        onOpenChange(false);
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -97,34 +147,38 @@ export function AddProductDialog({ open, onOpenChange }: AddProductDialogProps) 
               <div className="space-y-2">
                 <Label htmlFor="category">Category</Label>
                 <Select
-                  value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  value={formData.categoryId}
+                  onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
-                    <SelectItem value="smartphones">Smartphones</SelectItem>
-                    <SelectItem value="laptops">Laptops</SelectItem>
-                    <SelectItem value="tablets">Tablets</SelectItem>
-                    <SelectItem value="accessories">Accessories</SelectItem>
+                    <SelectItem value="none">No category</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category.id} value={category.id}>
+                        {category.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="brand">Brand</Label>
                 <Select
-                  value={formData.brand}
-                  onValueChange={(value) => setFormData({ ...formData, brand: value })}
+                  value={formData.brandId}
+                  onValueChange={(value) => setFormData({ ...formData, brandId: value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select brand" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
-                    <SelectItem value="apple">Apple</SelectItem>
-                    <SelectItem value="samsung">Samsung</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="generic">Generic</SelectItem>
+                    <SelectItem value="none">No brand</SelectItem>
+                    {brands.map((brand) => (
+                      <SelectItem key={brand.id} value={brand.id}>
+                        {brand.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -248,10 +302,12 @@ export function AddProductDialog({ open, onOpenChange }: AddProductDialogProps) 
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
               Cancel
             </Button>
-            <Button type="submit">Add Product</Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Adding..." : "Add Product"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

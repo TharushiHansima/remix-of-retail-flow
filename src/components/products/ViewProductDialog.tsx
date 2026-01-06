@@ -13,7 +13,9 @@ interface Product {
   sku: string;
   name: string;
   category: string;
+  categoryId?: string | null;
   brand: string;
+  brandId?: string | null;
   type: "standard" | "serialized" | "batch";
   price: number;
   wholesalePrice?: number;
@@ -52,7 +54,7 @@ export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Product Details</DialogTitle>
         </DialogHeader>
