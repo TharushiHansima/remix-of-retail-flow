@@ -14,6 +14,7 @@ import {
   Eye,
   Pencil,
   MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,8 +51,19 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface AgingBucket {
   current: number;
@@ -99,7 +111,9 @@ const PayablesAging = () => {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null);
+  const [invoiceToDelete, setInvoiceToDelete] = useState<SupplierInvoice | null>(null);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["supplier-invoices-aging"],
@@ -135,6 +149,25 @@ const PayablesAging = () => {
     },
     onError: () => {
       toast.error("Failed to record payment");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (invoiceId: string) => {
+      const { error } = await supabase
+        .from("supplier_invoices")
+        .delete()
+        .eq("id", invoiceId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["supplier-invoices-aging"] });
+      setDeleteDialogOpen(false);
+      setInvoiceToDelete(null);
+      toast.success("Invoice deleted");
+    },
+    onError: () => {
+      toast.error("Failed to delete invoice");
     },
   });
 
@@ -207,6 +240,17 @@ const PayablesAging = () => {
   const handleEditInvoice = (invoiceId: string) => {
     setSelectedInvoiceId(invoiceId);
     setEditDialogOpen(true);
+  };
+
+  const handleDeleteInvoice = (invoice: SupplierInvoice) => {
+    setInvoiceToDelete(invoice);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (invoiceToDelete) {
+      deleteMutation.mutate(invoiceToDelete.id);
+    }
   };
 
   return (
@@ -387,6 +431,18 @@ const PayablesAging = () => {
                                 <CreditCard className="h-4 w-4 mr-2" />
                                 Record Payment
                               </DropdownMenuItem>
+                              {Number(invoice.paid_amount) === 0 && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => handleDeleteInvoice(invoice)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Invoice
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -488,6 +544,26 @@ const PayablesAging = () => {
         onOpenChange={setEditDialogOpen}
         invoiceId={selectedInvoiceId}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete invoice {invoiceToDelete?.invoice_number}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
