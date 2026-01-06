@@ -297,7 +297,7 @@ export const navigationConfig: NavItem[] = [
       { id: 'list', title: 'Supplier List', href: '/suppliers/list' },
       { id: 'orders', title: 'Purchase Orders', href: '/suppliers/orders' },
       { id: 'grn', title: 'GRN', href: '/suppliers/grn' },
-      { id: 'payables', title: 'Payables Aging', href: '/suppliers/payables' },
+      { id: 'payables', title: 'Supplier Payables Aging', href: '/suppliers/payables' },
       { id: 'batches', title: 'Import Batches', href: '/suppliers/batches', featureId: 'landed_costs' },
     ],
   },
