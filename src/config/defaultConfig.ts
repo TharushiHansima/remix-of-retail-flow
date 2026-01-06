@@ -257,6 +257,7 @@ export const navigationConfig: NavItem[] = [
       { id: 'products', title: 'Products', href: '/inventory/products' },
       { id: 'categories', title: 'Categories & Brands', href: '/inventory/categories' },
       { id: 'stock', title: 'Stock Overview', href: '/inventory/stock' },
+      { id: 'locations', title: 'Stock Locations', href: '/inventory/locations' },
       { id: 'serials', title: 'Serial Registry', href: '/inventory/serials', featureId: 'serial_tracking' },
       { id: 'transfers', title: 'Stock Transfers', href: '/inventory/transfers', featureId: 'stock_transfers' },
       { id: 'adjustments', title: 'Stock Adjustments', href: '/inventory/adjustments', featureId: 'stock_adjustments' },
@@ -296,6 +297,7 @@ export const navigationConfig: NavItem[] = [
       { id: 'list', title: 'Supplier List', href: '/suppliers/list' },
       { id: 'orders', title: 'Purchase Orders', href: '/suppliers/orders' },
       { id: 'grn', title: 'GRN', href: '/suppliers/grn' },
+      { id: 'payables', title: 'Payables Aging', href: '/suppliers/payables' },
       { id: 'batches', title: 'Import Batches', href: '/suppliers/batches', featureId: 'landed_costs' },
     ],
   },
@@ -309,6 +311,7 @@ export const navigationConfig: NavItem[] = [
       { id: 'inventory', title: 'Inventory Reports', href: '/reports/inventory' },
       { id: 'repairs', title: 'Repair Reports', href: '/reports/repairs' },
       { id: 'financial', title: 'Financial Summary', href: '/reports/financial' },
+      { id: 'scheduled', title: 'Scheduled Reports', href: '/reports/scheduled' },
     ],
   },
   {
