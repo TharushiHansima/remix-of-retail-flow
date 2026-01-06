@@ -84,7 +84,7 @@ export default function POS() {
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
   
   // Cash drawer integration
-  const { activeDrawer, hasActiveDrawer, recordSale, isRecordingSale } = useCashDrawer();
+  const { activeDrawer, hasActiveDrawer, recordSale, recordRefund, isRecordingSale } = useCashDrawer();
   
   // Dialogs
   const [scannerOpen, setScannerOpen] = useState(false);
