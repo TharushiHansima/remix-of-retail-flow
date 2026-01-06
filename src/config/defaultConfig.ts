@@ -241,6 +241,7 @@ export const navigationConfig: NavItem[] = [
     children: [
       { id: 'pos', title: 'POS Billing', href: '/pos', featureId: undefined },
       { id: 'cash-drawer', title: 'Cash Drawer', href: '/cash-drawer' },
+      { id: 'petty-cash', title: 'Petty Cash', href: '/petty-cash' },
       { id: 'invoices', title: 'Sales Invoices', href: '/sales/invoices' },
       { id: 'quotations', title: 'Quotations', href: '/sales/quotations' },
       { id: 'returns', title: 'Returns & Refunds', href: '/sales/returns', featureId: 'returns' },
