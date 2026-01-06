@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 
 export type AppRole = "admin" | "manager" | "cashier" | "storekeeper" | "technician" | "accountant";
 
@@ -41,180 +41,314 @@ interface AuthContextType {
   isApproved: boolean;
   isPendingApproval: boolean;
   pendingUsers: PendingUser[];
+
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string, role: AppRole) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+
   hasRole: (role: AppRole) => boolean;
+
+  // keep for UI compatibility (backend approval not wired yet)
   approveUser: (userId: string) => void;
   rejectUser: (userId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Pre-existing admin account
-const adminUser: User = {
-  id: "admin-001",
-  email: "admin@devlabco.com",
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
+const ACCESS_TOKEN_KEY = "erp.accessToken";
+
+type ApiErrorShape =
+  | { message?: string | string[]; error?: string; statusCode?: number }
+  | string
+  | null
+  | undefined;
+
+function extractErrorMessage(data: ApiErrorShape): string {
+  if (!data) return "Request failed";
+  if (typeof data === "string") return data;
+  const msg = (data as any).message;
+  if (Array.isArray(msg)) return msg.join(", ");
+  return msg || (data as any).error || "Request failed";
+}
+
+async function requestJSON<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const url = path.startsWith("http") ? path : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      Accept: "application/json",
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(options.headers || {}),
+    },
+  });
+
+  const contentType = res.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+  const data = isJson ? await res.json().catch(() => null) : await res.text().catch(() => null);
+
+  if (!res.ok) {
+    throw new Error(extractErrorMessage(data as any));
+  }
+
+  return data as T;
+}
+
+function getAccessToken(): string | null {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+function setAccessToken(token: string) {
+  localStorage.setItem(ACCESS_TOKEN_KEY, token);
+}
+
+function clearAccessToken() {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+}
+
+/**
+ * Map frontend role -> backend role safely.
+ * If your backend enum doesn't have storekeeper/accountant yet, sending them will fail.
+ * Change this mapping after backend enum is updated.
+ */
+function toBackendRole(role: AppRole): "admin" | "manager" | "cashier" | "technician" {
+  if (role === "admin") return "admin";
+  if (role === "manager") return "manager";
+  if (role === "technician") return "technician";
+  // storekeeper/accountant/cashier -> cashier (safe default)
+  return "cashier";
+}
+
+type AuthTokensResponse = {
+  accessToken: string;
+  refreshToken?: string;
+  user?: {
+    userId?: string;
+    profileId?: string;
+    role?: string;
+    branchId?: string | null;
+  };
 };
 
-const adminProfile: Profile = {
-  id: "admin-001",
-  user_id: "admin-001",
-  email: "admin@devlabco.com",
-  full_name: "System Administrator",
-  avatar_url: null,
-  approval_status: "approved",
-  role: "admin",
-  created_at: "2024-01-01T00:00:00Z",
+type MeResponse = {
+  user: { id: string; email: string };
+  profile: {
+    id: string;
+    email: string;
+    name: string | null;
+    appRole: string;
+    branchId: string | null;
+    isActive: boolean;
+  } | null;
 };
 
-// Mock registered users database (with passwords for demo)
-const initialRegisteredUsers: Map<string, { user: User; profile: Profile; password: string }> = new Map([
-  ["admin@devlabco.com", { 
-    user: adminUser, 
-    profile: adminProfile, 
-    password: "admin123" 
-  }],
-]);
+function buildProfileFromMe(me: MeResponse): { user: User; profile: Profile } {
+  const role = (me.profile?.appRole as AppRole) || "cashier";
+  const active = me.profile?.isActive ?? true;
+
+  const user: User = { id: me.user.id, email: me.user.email };
+
+  const profile: Profile = {
+    id: me.profile?.id ?? me.user.id,
+    user_id: me.user.id,
+    email: me.profile?.email ?? me.user.email,
+    full_name: me.profile?.name ?? null,
+    avatar_url: null,
+    approval_status: active ? "approved" : "pending",
+    role,
+    created_at: new Date().toISOString(),
+  };
+
+  return { user, profile };
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<unknown | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
-  const [isLoading] = useState(false);
-  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
-  const [registeredUsers] = useState(initialRegisteredUsers);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // keep for UI compatibility (approval flow not connected yet)
+  const [pendingUsers] = useState<PendingUser[]>([]);
+
+  // Restore session on refresh (if token exists)
+  useEffect(() => {
+    const boot = async () => {
+      const token = getAccessToken();
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      // session is whatever your app expects; keep it simple
+      setSession({ accessToken: token });
+
+      // Try /auth/me if available; fallback if not
+      try {
+        const me = await requestJSON<MeResponse>("/auth/me", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        const mapped = buildProfileFromMe(me);
+        setUser(mapped.user);
+        setProfile(mapped.profile);
+        setRoles([{ role: mapped.profile.role }]);
+      } catch {
+        // If token is invalid OR /auth/me not implemented yet, logout silently
+        clearAccessToken();
+        setUser(null);
+        setProfile(null);
+        setRoles([]);
+        setSession(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void boot();
+  }, []);
 
   const signIn = async (email: string, password: string) => {
-    const userRecord = registeredUsers.get(email.toLowerCase());
-    
-    if (!userRecord) {
-      return { error: new Error("Invalid login credentials") };
+    try {
+      const res = await requestJSON<AuthTokensResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: email.toLowerCase(),
+          password,
+        }),
+      });
+
+      setAccessToken(res.accessToken);
+      setSession({ accessToken: res.accessToken });
+
+      // optional: load profile from /auth/me
+      try {
+        const me = await requestJSON<MeResponse>("/auth/me", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${res.accessToken}` },
+        });
+
+        const mapped = buildProfileFromMe(me);
+        setUser(mapped.user);
+        setProfile(mapped.profile);
+        setRoles([{ role: mapped.profile.role }]);
+      } catch {
+        // fallback if /auth/me missing
+        setUser({ id: res.user?.userId || "unknown", email: email.toLowerCase() });
+        setProfile({
+          id: res.user?.profileId || "unknown",
+          user_id: res.user?.userId || "unknown",
+          email: email.toLowerCase(),
+          full_name: null,
+          avatar_url: null,
+          approval_status: "approved",
+          role: (res.user?.role as AppRole) || "cashier",
+          created_at: new Date().toISOString(),
+        });
+        setRoles([{ role: ((res.user?.role as AppRole) || "cashier") }]);
+      }
+
+      return { error: null };
+    } catch (e) {
+      return { error: e as Error };
     }
-    
-    if (userRecord.password !== password) {
-      return { error: new Error("Invalid login credentials") };
-    }
-    
-    if (userRecord.profile.approval_status === "pending") {
-      return { error: new Error("Your account is pending approval. Please wait for admin approval.") };
-    }
-    
-    if (userRecord.profile.approval_status === "rejected") {
-      return { error: new Error("Your account has been rejected. Please contact administrator.") };
-    }
-    
-    setUser(userRecord.user);
-    setSession({});
-    setProfile(userRecord.profile);
-    setRoles([{ role: userRecord.profile.role }]);
-    return { error: null };
   };
 
+  // ✅ SIGN UP (REGISTER) CONNECTED HERE
   const signUp = async (email: string, password: string, fullName: string, role: AppRole) => {
-    const emailLower = email.toLowerCase();
-    
-    // Check if user already exists
-    if (registeredUsers.has(emailLower)) {
-      return { error: new Error("An account with this email already exists") };
+    try {
+      const res = await requestJSON<AuthTokensResponse>("/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          email: email.toLowerCase(),
+          password,
+          name: fullName,
+          role: toBackendRole(role), // safe mapping until backend roles updated
+          // adminSecret: "change-me", // add only if you want admin creation protection
+        }),
+      });
+
+      setAccessToken(res.accessToken);
+      setSession({ accessToken: res.accessToken });
+
+      // optional: load profile from /auth/me
+      try {
+        const me = await requestJSON<MeResponse>("/auth/me", {
+          method: "GET",
+          headers: { Authorization: `Bearer ${res.accessToken}` },
+        });
+
+        const mapped = buildProfileFromMe(me);
+        setUser(mapped.user);
+        setProfile(mapped.profile);
+        setRoles([{ role: mapped.profile.role }]);
+      } catch {
+        // fallback if /auth/me missing
+        const safeRole = role; // keep UI role the user selected
+        const userId = res.user?.userId || `user-${Date.now()}`;
+        const profileId = res.user?.profileId || userId;
+
+        setUser({ id: userId, email: email.toLowerCase() });
+        setProfile({
+          id: profileId,
+          user_id: userId,
+          email: email.toLowerCase(),
+          full_name: fullName,
+          avatar_url: null,
+          approval_status: "approved",
+          role: safeRole,
+          created_at: new Date().toISOString(),
+        });
+        setRoles([{ role: safeRole }]);
+      }
+
+      return { error: null };
+    } catch (e) {
+      return { error: e as Error };
     }
-    
-    // Check if already in pending list
-    if (pendingUsers.some(u => u.email.toLowerCase() === emailLower)) {
-      return { error: new Error("An account with this email is already pending approval") };
-    }
-    
-    // Add to pending users
-    const newPendingUser: PendingUser = {
-      id: `user-${Date.now()}`,
-      email: emailLower,
-      full_name: fullName,
-      role,
-      password,
-      created_at: new Date().toISOString(),
-      approval_status: "pending",
-    };
-    
-    setPendingUsers(prev => [...prev, newPendingUser]);
-    
-    return { error: null };
   };
 
   const signOut = async () => {
+    clearAccessToken();
     setUser(null);
     setSession(null);
     setProfile(null);
     setRoles([]);
   };
 
-  const hasRole = (role: AppRole) => {
-    return roles.some((r) => r.role === role);
-  };
+  const hasRole = (role: AppRole) => roles.some((r) => r.role === role);
 
-  const approveUser = (userId: string) => {
-    const pendingUser = pendingUsers.find(u => u.id === userId);
-    if (!pendingUser) return;
-    
-    // Create approved user
-    const newUser: User = {
-      id: pendingUser.id,
-      email: pendingUser.email,
-    };
-    
-    const newProfile: Profile = {
-      id: pendingUser.id,
-      user_id: pendingUser.id,
-      email: pendingUser.email,
-      full_name: pendingUser.full_name,
-      avatar_url: null,
-      approval_status: "approved",
-      role: pendingUser.role,
-      created_at: pendingUser.created_at,
-    };
-    
-    // Add to registered users
-    registeredUsers.set(pendingUser.email, {
-      user: newUser,
-      profile: newProfile,
-      password: pendingUser.password,
-    });
-    
-    // Remove from pending
-    setPendingUsers(prev => prev.filter(u => u.id !== userId));
-  };
-
-  const rejectUser = (userId: string) => {
-    setPendingUsers(prev => prev.map(u => 
-      u.id === userId ? { ...u, approval_status: "rejected" as const } : u
-    ));
-  };
+  // approval flow not implemented yet (keep functions so UI won't break)
+  const approveUser = () => {};
+  const rejectUser = () => {};
 
   const isApproved = profile?.approval_status === "approved";
   const isPendingApproval = profile?.approval_status === "pending";
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        profile,
-        roles,
-        isLoading,
-        isApproved,
-        isPendingApproval,
-        pendingUsers,
-        signIn,
-        signUp,
-        signOut,
-        hasRole,
-        approveUser,
-        rejectUser,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextType>(
+    () => ({
+      user,
+      session,
+      profile,
+      roles,
+      isLoading,
+      isApproved,
+      isPendingApproval,
+      pendingUsers,
+      signIn,
+      signUp,
+      signOut,
+      hasRole,
+      approveUser,
+      rejectUser,
+    }),
+    [user, session, profile, roles, isLoading, isApproved, isPendingApproval, pendingUsers],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
