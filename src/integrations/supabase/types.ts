@@ -632,6 +632,45 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          action_url: string | null
+          category: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          metadata: Json | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          action_url?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          metadata?: Json | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          action_url?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          metadata?: Json | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           amount: number
@@ -772,6 +811,92 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_stock_locations: {
+        Row: {
+          id: string
+          is_primary: boolean
+          location_id: string
+          product_id: string
+          quantity: number
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          is_primary?: boolean
+          location_id: string
+          product_id: string
+          quantity?: number
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          is_primary?: boolean
+          location_id?: string
+          product_id?: string
+          quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_stock_locations_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "stock_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_stock_locations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_uom: {
+        Row: {
+          barcode: string | null
+          conversion_factor: number
+          created_at: string
+          id: string
+          is_base_unit: boolean
+          is_purchase_unit: boolean
+          is_sales_unit: boolean
+          product_id: string
+          uom_name: string
+        }
+        Insert: {
+          barcode?: string | null
+          conversion_factor?: number
+          created_at?: string
+          id?: string
+          is_base_unit?: boolean
+          is_purchase_unit?: boolean
+          is_sales_unit?: boolean
+          product_id: string
+          uom_name: string
+        }
+        Update: {
+          barcode?: string | null
+          conversion_factor?: number
+          created_at?: string
+          id?: string
+          is_base_unit?: boolean
+          is_purchase_unit?: boolean
+          is_sales_unit?: boolean
+          product_id?: string
+          uom_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_uom_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -995,6 +1120,57 @@ export type Database = {
           },
         ]
       }
+      scheduled_reports: {
+        Row: {
+          created_at: string
+          created_by: string
+          filters: Json | null
+          format: string
+          id: string
+          is_active: boolean
+          last_sent_at: string | null
+          name: string
+          recipients: string[]
+          report_type: string
+          schedule_day: number | null
+          schedule_time: string
+          schedule_type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          filters?: Json | null
+          format?: string
+          id?: string
+          is_active?: boolean
+          last_sent_at?: string | null
+          name: string
+          recipients: string[]
+          report_type: string
+          schedule_day?: number | null
+          schedule_time?: string
+          schedule_type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          filters?: Json | null
+          format?: string
+          id?: string
+          is_active?: boolean
+          last_sent_at?: string | null
+          name?: string
+          recipients?: string[]
+          report_type?: string
+          schedule_day?: number | null
+          schedule_time?: string
+          schedule_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       serial_numbers: {
         Row: {
           branch_id: string | null
@@ -1171,6 +1347,56 @@ export type Database = {
           },
         ]
       }
+      stock_locations: {
+        Row: {
+          aisle: string | null
+          bin: string | null
+          branch_id: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          location_code: string
+          rack: string | null
+          shelf: string | null
+          zone: string | null
+        }
+        Insert: {
+          aisle?: string | null
+          bin?: string | null
+          branch_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          location_code: string
+          rack?: string | null
+          shelf?: string | null
+          zone?: string | null
+        }
+        Update: {
+          aisle?: string | null
+          bin?: string | null
+          branch_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          location_code?: string
+          rack?: string | null
+          shelf?: string | null
+          zone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_locations_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_transfer_items: {
         Row: {
           id: string
@@ -1257,6 +1483,119 @@ export type Database = {
             columns: ["to_branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_invoices: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          due_date: string
+          grn_id: string | null
+          id: string
+          invoice_date: string
+          invoice_number: string
+          notes: string | null
+          paid_amount: number
+          status: string
+          subtotal: number
+          supplier_id: string
+          tax_amount: number
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          due_date: string
+          grn_id?: string | null
+          id?: string
+          invoice_date: string
+          invoice_number: string
+          notes?: string | null
+          paid_amount?: number
+          status?: string
+          subtotal?: number
+          supplier_id: string
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          due_date?: string
+          grn_id?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_number?: string
+          notes?: string | null
+          paid_amount?: number
+          status?: string
+          subtotal?: number
+          supplier_id?: string
+          tax_amount?: number
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_invoices_grn_id_fkey"
+            columns: ["grn_id"]
+            isOneToOne: false
+            referencedRelation: "grn"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_invoices_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string
+          reference: string | null
+          supplier_invoice_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method: string
+          reference?: string | null
+          supplier_invoice_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          reference?: string | null
+          supplier_invoice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_payments_supplier_invoice_id_fkey"
+            columns: ["supplier_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_invoices"
             referencedColumns: ["id"]
           },
         ]
