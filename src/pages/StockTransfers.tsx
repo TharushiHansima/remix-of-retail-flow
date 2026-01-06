@@ -11,6 +11,8 @@ import {
   Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CreateTransferDialog } from "@/components/stock-transfers/CreateTransferDialog";
+import { ViewTransferDialog } from "@/components/stock-transfers/ViewTransferDialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -85,6 +87,85 @@ const transfers: Transfer[] = [
     createdAt: new Date("2024-01-20"),
     notes: "Monthly stock replenishment",
   },
+  {
+    id: "4",
+    transferNumber: "TRF-2024-0004",
+    fromBranch: "Warehouse",
+    toBranch: "Mall Outlet",
+    status: "received",
+    itemCount: 12,
+    totalQty: 65,
+    createdAt: new Date("2024-01-22"),
+    receivedAt: new Date("2024-01-24"),
+    notes: "New store opening stock",
+  },
+  {
+    id: "5",
+    transferNumber: "TRF-2024-0005",
+    fromBranch: "Main Branch",
+    toBranch: "Warehouse",
+    status: "received",
+    itemCount: 4,
+    totalQty: 15,
+    createdAt: new Date("2024-01-25"),
+    receivedAt: new Date("2024-01-26"),
+    notes: "Return of excess stock",
+  },
+  {
+    id: "6",
+    transferNumber: "TRF-2024-0006",
+    fromBranch: "Downtown Store",
+    toBranch: "Main Branch",
+    status: "in_transit",
+    itemCount: 2,
+    totalQty: 8,
+    createdAt: new Date("2024-01-28"),
+    notes: "Customer special order transfer",
+  },
+  {
+    id: "7",
+    transferNumber: "TRF-2024-0007",
+    fromBranch: "Warehouse",
+    toBranch: "Main Branch",
+    status: "pending",
+    itemCount: 15,
+    totalQty: 80,
+    createdAt: new Date("2024-01-30"),
+    notes: "February stock preparation",
+  },
+  {
+    id: "8",
+    transferNumber: "TRF-2024-0008",
+    fromBranch: "Mall Outlet",
+    toBranch: "Downtown Store",
+    status: "cancelled",
+    itemCount: 3,
+    totalQty: 12,
+    createdAt: new Date("2024-02-01"),
+    notes: "Cancelled - items unavailable",
+  },
+  {
+    id: "9",
+    transferNumber: "TRF-2024-0009",
+    fromBranch: "Warehouse",
+    toBranch: "Downtown Store",
+    status: "in_transit",
+    itemCount: 6,
+    totalQty: 30,
+    createdAt: new Date("2024-02-03"),
+    notes: "Weekend sale preparation",
+  },
+  {
+    id: "10",
+    transferNumber: "TRF-2024-0010",
+    fromBranch: "Main Branch",
+    toBranch: "Mall Outlet",
+    status: "pending",
+    itemCount: 10,
+    totalQty: 45,
+    createdAt: new Date("2024-02-05"),
+    notes: "High demand items restock",
+  },
 ];
 
 const statusColors: Record<string, string> = {
@@ -104,6 +185,14 @@ const statusLabels: Record<string, string> = {
 export default function StockTransfers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedTransfer, setSelectedTransfer] = useState<Transfer | null>(null);
+
+  const handleViewDetails = (transfer: Transfer) => {
+    setSelectedTransfer(transfer);
+    setViewDialogOpen(true);
+  };
 
   const filteredTransfers = transfers.filter((t) => {
     const matchesSearch =
@@ -125,7 +214,7 @@ export default function StockTransfers() {
           <h1 className="text-2xl font-bold text-foreground">Stock Transfers</h1>
           <p className="text-muted-foreground">Transfer inventory between branches</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Transfer
         </Button>
@@ -242,7 +331,7 @@ export default function StockTransfers() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-popover">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleViewDetails(transfer)}>
                         <Eye className="mr-2 h-4 w-4" />
                         View Details
                       </DropdownMenuItem>
@@ -266,6 +355,9 @@ export default function StockTransfers() {
           </TableBody>
         </Table>
       </div>
+
+      <CreateTransferDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      <ViewTransferDialog open={viewDialogOpen} onOpenChange={setViewDialogOpen} transfer={selectedTransfer} />
     </div>
   );
 }

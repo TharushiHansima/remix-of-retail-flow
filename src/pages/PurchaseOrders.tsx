@@ -29,6 +29,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CreatePurchaseOrderDialog } from "@/components/purchase-orders/CreatePurchaseOrderDialog";
+import { ViewPurchaseOrderDialog } from "@/components/purchase-orders/ViewPurchaseOrderDialog";
+import { EditPurchaseOrderDialog } from "@/components/purchase-orders/EditPurchaseOrderDialog";
+import { CreateGRNDialog } from "@/components/purchase-orders/CreateGRNDialog";
 
 interface PurchaseOrder {
   id: string;
@@ -92,6 +96,106 @@ const orders: PurchaseOrder[] = [
     totalValue: 8500,
     status: "pending",
   },
+  {
+    id: "6",
+    poNumber: "PO-2024-0127",
+    supplier: "Sony Corporation",
+    orderDate: "2024-01-27",
+    expectedDate: "2024-02-12",
+    items: 20,
+    totalValue: 62000,
+    status: "draft",
+  },
+  {
+    id: "7",
+    poNumber: "PO-2024-0128",
+    supplier: "Dell Technologies",
+    orderDate: "2024-01-28",
+    expectedDate: "2024-02-15",
+    items: 12,
+    totalValue: 78500,
+    status: "pending",
+  },
+  {
+    id: "8",
+    poNumber: "PO-2024-0129",
+    supplier: "Logitech International",
+    orderDate: "2024-01-29",
+    expectedDate: "2024-02-08",
+    items: 45,
+    totalValue: 15600,
+    status: "approved",
+  },
+  {
+    id: "9",
+    poNumber: "PO-2024-0130",
+    supplier: "Anker Innovations",
+    orderDate: "2024-01-30",
+    expectedDate: "2024-02-12",
+    items: 80,
+    totalValue: 9200,
+    status: "shipped",
+  },
+  {
+    id: "10",
+    poNumber: "PO-2024-0131",
+    supplier: "Google Hardware",
+    orderDate: "2024-01-31",
+    expectedDate: "2024-02-18",
+    items: 18,
+    totalValue: 54000,
+    status: "pending",
+  },
+  {
+    id: "11",
+    poNumber: "PO-2024-0132",
+    supplier: "Lenovo Group",
+    orderDate: "2024-02-01",
+    expectedDate: "2024-02-20",
+    items: 10,
+    totalValue: 48000,
+    status: "approved",
+  },
+  {
+    id: "12",
+    poNumber: "PO-2024-0133",
+    supplier: "TP-Link Technologies",
+    orderDate: "2024-02-02",
+    expectedDate: "2024-02-16",
+    items: 35,
+    totalValue: 12800,
+    status: "received",
+  },
+  {
+    id: "13",
+    poNumber: "PO-2024-0134",
+    supplier: "Bose Corporation",
+    orderDate: "2024-02-03",
+    expectedDate: "2024-02-22",
+    items: 15,
+    totalValue: 28500,
+    status: "partial",
+  },
+  {
+    id: "14",
+    poNumber: "PO-2024-0135",
+    supplier: "OnePlus Technology",
+    orderDate: "2024-02-04",
+    expectedDate: "2024-02-25",
+    items: 22,
+    totalValue: 66000,
+    status: "draft",
+  },
+  {
+    id: "15",
+    poNumber: "PO-2024-0136",
+    supplier: "Nintendo Co.",
+    orderDate: "2024-02-05",
+    expectedDate: "2024-02-28",
+    items: 30,
+    totalValue: 42000,
+    status: "pending",
+  },
 ];
 
 const statusConfig = {
@@ -105,12 +209,32 @@ const statusConfig = {
 
 export default function PurchaseOrders() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isGRNDialogOpen, setIsGRNDialogOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
 
   const filteredOrders = orders.filter(
     (o) =>
       o.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       o.supplier.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleViewDetails = (order: PurchaseOrder) => {
+    setSelectedOrder(order);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleEditOrder = (order: PurchaseOrder) => {
+    setSelectedOrder(order);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleCreateGRN = (order: PurchaseOrder) => {
+    setSelectedOrder(order);
+    setIsGRNDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -120,11 +244,32 @@ export default function PurchaseOrders() {
           <h1 className="text-2xl font-bold text-foreground">Purchase Orders</h1>
           <p className="text-muted-foreground">Manage supplier orders and procurement</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Purchase Order
         </Button>
       </div>
+
+      {/* Dialogs */}
+      <CreatePurchaseOrderDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      />
+      <ViewPurchaseOrderDialog
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
+        order={selectedOrder}
+      />
+      <EditPurchaseOrderDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        order={selectedOrder}
+      />
+      <CreateGRNDialog
+        open={isGRNDialogOpen}
+        onOpenChange={setIsGRNDialogOpen}
+        order={selectedOrder}
+      />
 
       {/* Status Tabs */}
       <Tabs defaultValue="all">
@@ -190,15 +335,15 @@ export default function PurchaseOrders() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-popover">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewDetails(order)}>
                           <Eye className="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEditOrder(order)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Order
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleCreateGRN(order)}>
                           <Package className="mr-2 h-4 w-4" />
                           Create GRN
                         </DropdownMenuItem>

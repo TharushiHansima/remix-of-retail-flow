@@ -13,6 +13,8 @@ import {
   Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CreateAdjustmentDialog } from "@/components/stock-adjustments/CreateAdjustmentDialog";
+import { ViewAdjustmentDialog } from "@/components/stock-adjustments/ViewAdjustmentDialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -107,6 +109,86 @@ const adjustments: Adjustment[] = [
     createdBy: "John Doe",
     createdAt: new Date("2024-01-26"),
   },
+  {
+    id: "5",
+    adjustmentNumber: "ADJ-2024-0005",
+    branch: "Downtown Store",
+    type: "loss",
+    reason: "Items damaged during transit from warehouse",
+    status: "approved",
+    itemCount: 4,
+    totalChange: -7,
+    createdBy: "Lisa Chen",
+    createdAt: new Date("2024-01-28"),
+    approvedBy: "Sarah Manager",
+    approvedAt: new Date("2024-01-29"),
+  },
+  {
+    id: "6",
+    adjustmentNumber: "ADJ-2024-0006",
+    branch: "Warehouse",
+    type: "miscount",
+    reason: "Annual inventory audit adjustment",
+    status: "pending",
+    itemCount: 15,
+    totalChange: -12,
+    createdBy: "Robert Taylor",
+    createdAt: new Date("2024-02-01"),
+  },
+  {
+    id: "7",
+    adjustmentNumber: "ADJ-2024-0007",
+    branch: "Main Branch",
+    type: "gain",
+    reason: "Customer return - wrong item shipped, extra received",
+    status: "approved",
+    itemCount: 1,
+    totalChange: 2,
+    createdBy: "Amanda Wong",
+    createdAt: new Date("2024-02-03"),
+    approvedBy: "John Doe",
+    approvedAt: new Date("2024-02-04"),
+  },
+  {
+    id: "8",
+    adjustmentNumber: "ADJ-2024-0008",
+    branch: "Mall Outlet",
+    type: "damage",
+    reason: "Display units damaged - customer accident",
+    status: "rejected",
+    itemCount: 2,
+    totalChange: -4,
+    createdBy: "Kevin Park",
+    createdAt: new Date("2024-02-05"),
+    approvedBy: "Sarah Manager",
+    approvedAt: new Date("2024-02-06"),
+  },
+  {
+    id: "9",
+    adjustmentNumber: "ADJ-2024-0009",
+    branch: "Warehouse",
+    type: "loss",
+    reason: "Expired batch disposal - accessories",
+    status: "approved",
+    itemCount: 8,
+    totalChange: -25,
+    createdBy: "Emily Davis",
+    createdAt: new Date("2024-02-08"),
+    approvedBy: "Robert Taylor",
+    approvedAt: new Date("2024-02-09"),
+  },
+  {
+    id: "10",
+    adjustmentNumber: "ADJ-2024-0010",
+    branch: "Downtown Store",
+    type: "miscount",
+    reason: "Weekly stock reconciliation discrepancy",
+    status: "pending",
+    itemCount: 6,
+    totalChange: 4,
+    createdBy: "Mike Staff",
+    createdAt: new Date("2024-02-10"),
+  },
 ];
 
 const statusColors: Record<string, string> = {
@@ -135,6 +217,14 @@ export default function StockAdjustments() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [selectedAdjustment, setSelectedAdjustment] = useState<Adjustment | null>(null);
+
+  const handleViewDetails = (adjustment: Adjustment) => {
+    setSelectedAdjustment(adjustment);
+    setViewDialogOpen(true);
+  };
 
   const filteredAdjustments = adjustments.filter((adj) => {
     const matchesSearch =
@@ -161,7 +251,7 @@ export default function StockAdjustments() {
           <h1 className="text-2xl font-bold text-foreground">Stock Adjustments</h1>
           <p className="text-muted-foreground">Manage inventory adjustments with approval workflow</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
           <Plus className="h-4 w-4 mr-2" />
           New Adjustment
         </Button>
@@ -298,7 +388,7 @@ export default function StockAdjustments() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-popover">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleViewDetails(adj)}>
                           <Eye className="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
@@ -323,6 +413,9 @@ export default function StockAdjustments() {
           </TableBody>
         </Table>
       </div>
+
+      <CreateAdjustmentDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
+      <ViewAdjustmentDialog open={viewDialogOpen} onOpenChange={setViewDialogOpen} adjustment={selectedAdjustment} />
     </div>
   );
 }
