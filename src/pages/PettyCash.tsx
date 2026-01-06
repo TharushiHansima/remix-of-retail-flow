@@ -11,6 +11,8 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  FileSpreadsheet,
+  Image,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +36,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { AddPettyCashDialog } from "@/components/petty-cash/AddPettyCashDialog";
 import { ViewPettyCashDialog } from "@/components/petty-cash/ViewPettyCashDialog";
+import { ExpenseReportDialog } from "@/components/petty-cash/ExpenseReportDialog";
+import { FundBalanceCard } from "@/components/petty-cash/FundBalanceCard";
 
 const EXPENSE_CATEGORIES = [
   "Office Supplies",
@@ -52,6 +56,7 @@ interface PettyCashExpense {
   description: string;
   amount: number;
   receipt_reference: string | null;
+  receipt_url?: string | null;
   created_by: string;
   approved_by: string | null;
   approved_at: string | null;
@@ -67,6 +72,7 @@ export default function PettyCash() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<PettyCashExpense | null>(null);
 
   const canApprove = hasRole("admin") || hasRole("manager");
@@ -96,6 +102,11 @@ export default function PettyCash() {
   // Approve expense mutation
   const approveMutation = useMutation({
     mutationFn: async (expenseId: string) => {
+      // Get expense details
+      const expense = expenses.find(e => e.id === expenseId);
+      if (!expense) throw new Error("Expense not found");
+
+      // Update expense status
       const { error } = await supabase
         .from("petty_cash_expenses")
         .update({
@@ -105,9 +116,41 @@ export default function PettyCash() {
         })
         .eq("id", expenseId);
       if (error) throw error;
+
+      // Fetch current fund balance and deduct expense
+      const { data: fundData } = await supabase
+        .from("petty_cash_funds")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      const currentBalance = fundData && fundData.length > 0 
+        ? Number(fundData[0].balance_after) 
+        : 0;
+
+      // Get branch
+      const { data: branches } = await supabase
+        .from("branches")
+        .select("id")
+        .eq("is_active", true)
+        .limit(1);
+
+      if (branches && branches.length > 0) {
+        // Record fund transaction
+        await supabase.from("petty_cash_funds").insert({
+          branch_id: branches[0].id,
+          transaction_type: "expense",
+          amount: expense.amount,
+          balance_after: currentBalance - Number(expense.amount),
+          reference_id: expenseId,
+          description: expense.description,
+          created_by: user?.id,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["petty-cash-expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-fund-transactions"] });
       toast.success("Expense approved");
     },
     onError: () => {
@@ -181,14 +224,21 @@ export default function PettyCash() {
           <h1 className="text-2xl font-bold">Petty Cash</h1>
           <p className="text-muted-foreground">Track and manage petty cash expenses</p>
         </div>
-        <Button onClick={() => setAddDialogOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Record Expense
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setReportDialogOpen(true)}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Reports
+          </Button>
+          <Button onClick={() => setAddDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Record Expense
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
+        <FundBalanceCard />
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
@@ -271,7 +321,7 @@ export default function PettyCash() {
               <TableHead>Date</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Description</TableHead>
-              <TableHead>Receipt #</TableHead>
+              <TableHead>Receipt</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -298,8 +348,17 @@ export default function PettyCash() {
                     <Badge variant="outline">{expense.category}</Badge>
                   </TableCell>
                   <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {expense.receipt_reference || "-"}
+                  <TableCell>
+                    {expense.receipt_url ? (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Image className="h-4 w-4" />
+                        <span className="text-xs">Attached</span>
+                      </div>
+                    ) : expense.receipt_reference ? (
+                      <span className="text-muted-foreground text-sm">{expense.receipt_reference}</span>
+                    ) : (
+                      "-"
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-medium">
                     ${Number(expense.amount).toFixed(2)}
@@ -350,6 +409,11 @@ export default function PettyCash() {
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
         categories={EXPENSE_CATEGORIES}
+      />
+      
+      <ExpenseReportDialog
+        open={reportDialogOpen}
+        onOpenChange={setReportDialogOpen}
       />
       
       {selectedExpense && (

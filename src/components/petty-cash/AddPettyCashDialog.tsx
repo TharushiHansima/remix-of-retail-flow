@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { z } from "zod";
+import { ReceiptUpload } from "./ReceiptUpload";
 
 const expenseSchema = z.object({
   category: z.string().min(1, "Category is required"),
@@ -54,6 +55,7 @@ export function AddPettyCashDialog({
     receipt_reference: "",
     notes: "",
   });
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Fetch branches
@@ -68,6 +70,24 @@ export function AddPettyCashDialog({
       return data;
     },
   });
+
+  // Fetch current fund balance
+  const { data: fundTransactions = [] } = useQuery({
+    queryKey: ["petty-cash-fund-transactions"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("petty_cash_funds")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const currentBalance = fundTransactions.length > 0 
+    ? Number(fundTransactions[0].balance_after) 
+    : 0;
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -89,13 +109,18 @@ export function AddPettyCashDialog({
 
       setErrors({});
 
+      const amount = parseFloat(formData.amount);
+      const branchId = branches[0]?.id;
+
+      // Insert expense
       const { error } = await supabase.from("petty_cash_expenses").insert({
-        branch_id: branches[0]?.id,
+        branch_id: branchId,
         category: formData.category,
         description: formData.description.trim(),
-        amount: parseFloat(formData.amount),
+        amount: amount,
         expense_date: formData.expense_date,
         receipt_reference: formData.receipt_reference.trim() || null,
+        receipt_url: receiptUrl,
         notes: formData.notes.trim() || null,
         created_by: user?.id,
         status: "pending",
@@ -105,6 +130,7 @@ export function AddPettyCashDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["petty-cash-expenses"] });
+      queryClient.invalidateQueries({ queryKey: ["petty-cash-fund-transactions"] });
       toast.success("Expense recorded successfully");
       onOpenChange(false);
       resetForm();
@@ -125,6 +151,7 @@ export function AddPettyCashDialog({
       receipt_reference: "",
       notes: "",
     });
+    setReceiptUrl(null);
     setErrors({});
   };
 
@@ -135,6 +162,11 @@ export function AddPettyCashDialog({
           <DialogTitle>Record Petty Cash Expense</DialogTitle>
           <DialogDescription>
             Add a new petty cash expense for approval.
+            {currentBalance > 0 && (
+              <span className="block mt-1">
+                Available balance: <strong>${currentBalance.toFixed(2)}</strong>
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -210,6 +242,15 @@ export function AddPettyCashDialog({
             {errors.description && (
               <p className="text-sm text-destructive">{errors.description}</p>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Receipt Image (Optional)</Label>
+            <ReceiptUpload
+              receiptUrl={receiptUrl}
+              onUpload={setReceiptUrl}
+              onRemove={() => setReceiptUrl(null)}
+            />
           </div>
 
           <div className="space-y-2">
