@@ -53,6 +53,11 @@ import UserApprovals from "./pages/UserApprovals";
 import Profile from "./pages/Profile";
 import ChangePassword from "./pages/ChangePassword";
 import Settings from "./pages/Settings";
+import CashDrawer from "./pages/CashDrawer";
+import PettyCash from "./pages/PettyCash";
+import ScheduledReports from "./pages/ScheduledReports";
+import StockLocations from "./pages/StockLocations";
+import PayablesAging from "./pages/PayablesAging";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -72,6 +77,8 @@ const App = () => (
                   <Route element={<AppLayout />}>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/pos" element={<POS />} />
+                    <Route path="/cash-drawer" element={<CashDrawer />} />
+                    <Route path="/petty-cash" element={<PettyCash />} />
                     <Route path="/sales/invoices" element={<Invoices />} />
                     <Route path="/sales/quotations" element={<Quotations />} />
                     <Route path="/sales/returns" element={<ReturnsRefunds />} />
@@ -95,11 +102,14 @@ const App = () => (
                     <Route path="/reports/inventory" element={<InventoryReports />} />
                     <Route path="/reports/repairs" element={<RepairReports />} />
                     <Route path="/reports/financial" element={<FinancialSummary />} />
+                    <Route path="/reports/scheduled" element={<ScheduledReports />} />
                     <Route path="/suppliers" element={<Navigate to="/suppliers/list" replace />} />
                     <Route path="/suppliers/orders" element={<PurchaseOrders />} />
                     <Route path="/suppliers/list" element={<Suppliers />} />
                     <Route path="/suppliers/batches" element={<ImportBatches />} />
                     <Route path="/suppliers/grn" element={<GRN />} />
+                    <Route path="/suppliers/payables" element={<PayablesAging />} />
+                    <Route path="/inventory/locations" element={<StockLocations />} />
                     <Route path="/config/users" element={<UsersRoles />} />
                     <Route path="/config/user-approvals" element={<UserApprovals />} />
                     <Route path="/config/modules" element={<ModulesConfig />} />
