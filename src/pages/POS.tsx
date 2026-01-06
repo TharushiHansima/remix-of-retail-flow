@@ -29,6 +29,7 @@ import { BarcodeScannerDialog } from "@/components/pos/BarcodeScannerDialog";
 import { ReceiptDialog } from "@/components/pos/ReceiptDialog";
 import { CustomerSelectDialog } from "@/components/pos/CustomerSelectDialog";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
+import { OpenDrawerDialog } from "@/components/cash-drawer/OpenDrawerDialog";
 import { useCashDrawer } from "@/hooks/useCashDrawer";
 import { Link } from "react-router-dom";
 
@@ -91,6 +92,7 @@ export default function POS() {
   const [customerOpen, setCustomerOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [heldOrdersOpen, setHeldOrdersOpen] = useState(false);
+  const [openDrawerDialogOpen, setOpenDrawerDialogOpen] = useState(false);
   
   // Last completed sale for receipt
   const [lastSale, setLastSale] = useState<{
@@ -256,8 +258,8 @@ export default function POS() {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
             <span>No active cash drawer. Cash sales will not be recorded to the drawer.</span>
-            <Button variant="outline" size="sm" asChild className="ml-4">
-              <Link to="/cash-drawer">Open Drawer</Link>
+            <Button variant="outline" size="sm" onClick={() => setOpenDrawerDialogOpen(true)} className="ml-4">
+              Open Drawer
             </Button>
           </AlertDescription>
         </Alert>
@@ -599,6 +601,11 @@ export default function POS() {
         onClose={() => setPaymentOpen(false)}
         onComplete={handlePaymentComplete}
         total={total}
+      />
+
+      <OpenDrawerDialog
+        open={openDrawerDialogOpen}
+        onOpenChange={setOpenDrawerDialogOpen}
       />
 
       {/* Held Orders Dialog */}
