@@ -155,6 +155,112 @@ export type Database = {
         }
         Relationships: []
       }
+      cash_drawers: {
+        Row: {
+          actual_closing: number | null
+          branch_id: string
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          expected_closing: number | null
+          id: string
+          notes: string | null
+          opened_at: string
+          opened_by: string
+          opening_float: number
+          status: string
+          variance: number | null
+        }
+        Insert: {
+          actual_closing?: number | null
+          branch_id: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          expected_closing?: number | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by: string
+          opening_float?: number
+          status?: string
+          variance?: number | null
+        }
+        Update: {
+          actual_closing?: number | null
+          branch_id?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          expected_closing?: number | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string
+          opening_float?: number
+          status?: string
+          variance?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_drawers_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cash_transactions: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string
+          drawer_id: string
+          id: string
+          reason: string
+          reference: string | null
+          requires_approval: boolean
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by: string
+          drawer_id: string
+          id?: string
+          reason: string
+          reference?: string | null
+          requires_approval?: boolean
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string
+          drawer_id?: string
+          id?: string
+          reason?: string
+          reference?: string | null
+          requires_approval?: boolean
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_transactions_drawer_id_fkey"
+            columns: ["drawer_id"]
+            isOneToOne: false
+            referencedRelation: "cash_drawers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string

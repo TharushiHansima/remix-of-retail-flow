@@ -53,6 +53,7 @@ import UserApprovals from "./pages/UserApprovals";
 import Profile from "./pages/Profile";
 import ChangePassword from "./pages/ChangePassword";
 import Settings from "./pages/Settings";
+import CashDrawer from "./pages/CashDrawer";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -72,6 +73,7 @@ const App = () => (
                   <Route element={<AppLayout />}>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/pos" element={<POS />} />
+                    <Route path="/cash-drawer" element={<CashDrawer />} />
                     <Route path="/sales/invoices" element={<Invoices />} />
                     <Route path="/sales/quotations" element={<Quotations />} />
                     <Route path="/sales/returns" element={<ReturnsRefunds />} />
