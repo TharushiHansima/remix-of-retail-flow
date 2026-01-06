@@ -19,6 +19,7 @@ import {
   RotateCcw,
   CheckCircle,
   AlertTriangle,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ import { CustomerSelectDialog } from "@/components/pos/CustomerSelectDialog";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
 import { OpenDrawerDialog } from "@/components/cash-drawer/OpenDrawerDialog";
 import { RefundDialog } from "@/components/pos/RefundDialog";
+import { CloseDrawerDialog } from "@/components/cash-drawer/CloseDrawerDialog";
 import { useCashDrawer } from "@/hooks/useCashDrawer";
 import { Link } from "react-router-dom";
 
@@ -96,6 +98,7 @@ export default function POS() {
   const [heldOrdersOpen, setHeldOrdersOpen] = useState(false);
   const [openDrawerDialogOpen, setOpenDrawerDialogOpen] = useState(false);
   const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [closeDrawerDialogOpen, setCloseDrawerDialogOpen] = useState(false);
   
   // Last completed sale for receipt
   const [lastSale, setLastSale] = useState<{
@@ -284,9 +287,20 @@ export default function POS() {
             <span className="text-muted-foreground">Cash Drawer:</span>
             <span className="font-semibold text-foreground">${drawerBalance.toFixed(2)}</span>
           </div>
-          <Badge variant="secondary" className="text-xs">
-            Opened {new Date(activeDrawer.opened_at).toLocaleTimeString()}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              Opened {new Date(activeDrawer.opened_at).toLocaleTimeString()}
+            </Badge>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCloseDrawerDialogOpen(true)}
+              className="h-7 text-xs"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Close Drawer
+            </Button>
+          </div>
         </div>
       ) : (
         <Alert variant="destructive">
@@ -694,6 +708,19 @@ export default function POS() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Close Drawer Dialog */}
+      {activeDrawer && (
+        <CloseDrawerDialog
+          open={closeDrawerDialogOpen}
+          onOpenChange={setCloseDrawerDialogOpen}
+          drawer={{
+            id: activeDrawer.id,
+            opening_float: activeDrawer.opening_float,
+          }}
+          expectedBalance={drawerBalance}
+        />
       )}
     </div>
   );
