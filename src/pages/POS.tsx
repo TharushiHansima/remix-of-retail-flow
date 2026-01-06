@@ -17,16 +17,20 @@ import {
   History,
   RotateCcw,
   CheckCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { BarcodeScannerDialog } from "@/components/pos/BarcodeScannerDialog";
 import { ReceiptDialog } from "@/components/pos/ReceiptDialog";
 import { CustomerSelectDialog } from "@/components/pos/CustomerSelectDialog";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
+import { useCashDrawer } from "@/hooks/useCashDrawer";
+import { Link } from "react-router-dom";
 
 interface CartItem {
   id: string;
@@ -77,6 +81,9 @@ export default function POS() {
   const [discount, setDiscount] = useState(0);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
+  
+  // Cash drawer integration
+  const { activeDrawer, hasActiveDrawer, recordSale, isRecordingSale } = useCashDrawer();
   
   // Dialogs
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -197,8 +204,22 @@ export default function POS() {
     setSelectedCustomer(null);
   };
 
-  const handlePaymentComplete = (method: string, amountPaid: number) => {
+  const handlePaymentComplete = async (method: string, amountPaid: number) => {
     const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`;
+    
+    // Record cash sale to drawer if cash payment and drawer is open
+    if (method === "cash" && hasActiveDrawer) {
+      try {
+        await recordSale({
+          amount: total,
+          invoiceNumber,
+          paymentMethod: method,
+        });
+      } catch (error) {
+        console.error("Failed to record cash sale to drawer:", error);
+        // Continue with sale even if drawer recording fails
+      }
+    }
     
     setLastSale({
       cart: [...cart],
@@ -228,7 +249,21 @@ export default function POS() {
   );
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-7rem)]">
+    <div className="flex flex-col gap-4">
+      {/* Cash Drawer Warning */}
+      {!hasActiveDrawer && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>No active cash drawer. Cash sales will not be recorded to the drawer.</span>
+            <Button variant="outline" size="sm" asChild className="ml-4">
+              <Link to="/cash-drawer">Open Drawer</Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <div className="flex gap-4 h-[calc(100vh-7rem)]">
       {/* Left Panel - Product Search & Cart */}
       <div className="flex-1 flex flex-col bg-card rounded-lg border border-border shadow-sm overflow-hidden">
         {/* Search Bar */}
@@ -525,6 +560,7 @@ export default function POS() {
               Email
             </Button>
           </div>
+        </div>
         </div>
       </div>
 
