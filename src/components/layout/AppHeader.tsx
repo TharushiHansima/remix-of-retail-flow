@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Bell, Search, ChevronDown, User, LogOut, Settings, Key } from "lucide-react";
+import { Search, ChevronDown, User, LogOut, Settings, Key } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,9 +9,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { useAuth } from "@/contexts/AuthContext";
+import { NotificationCenter } from "@/components/notifications/NotificationCenter";
 
 interface AppHeaderProps {
   sidebarCollapsed: boolean;
@@ -71,41 +71,7 @@ export function AppHeader({ sidebarCollapsed }: AppHeaderProps) {
           <ThemeToggle />
 
           {/* Notifications */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                  3
-                </Badge>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 bg-popover">
-              <div className="p-3 border-b border-border">
-                <h4 className="font-semibold">Notifications</h4>
-              </div>
-              <div className="max-h-80 overflow-auto">
-                <DropdownMenuItem className="flex flex-col items-start gap-1 p-3">
-                  <span className="font-medium text-sm">Low Stock Alert</span>
-                  <span className="text-xs text-muted-foreground">
-                    iPhone 15 Pro Max - Only 2 units left
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="flex flex-col items-start gap-1 p-3">
-                  <span className="font-medium text-sm">Pending Approval</span>
-                  <span className="text-xs text-muted-foreground">
-                    Discount request #1234 needs review
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="flex flex-col items-start gap-1 p-3">
-                  <span className="font-medium text-sm">Overdue Repair</span>
-                  <span className="text-xs text-muted-foreground">
-                    Job card #JC-2024-0089 exceeded SLA
-                  </span>
-                </DropdownMenuItem>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <NotificationCenter />
 
           {/* User Menu */}
           <DropdownMenu>
