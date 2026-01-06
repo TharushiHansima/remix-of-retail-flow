@@ -40,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CreateSupplierInvoiceDialog } from "@/components/suppliers/CreateSupplierInvoiceDialog";
 
 interface AgingBucket {
   current: number;
@@ -84,6 +85,7 @@ const PayablesAging = () => {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentForm, setPaymentForm] = useState<PaymentForm>(emptyPaymentForm);
   const [selectedInvoice, setSelectedInvoice] = useState<SupplierInvoice | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const { data: invoices = [], isLoading } = useQuery({
     queryKey: ["supplier-invoices-aging"],
@@ -192,6 +194,10 @@ const PayablesAging = () => {
             Track outstanding supplier invoices by age
           </p>
         </div>
+        <Button onClick={() => setCreateDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Invoice
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-5">
@@ -428,6 +434,11 @@ const PayablesAging = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CreateSupplierInvoiceDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
     </div>
   );
 };
