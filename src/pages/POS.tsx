@@ -12,21 +12,30 @@ import {
   Printer,
   Mail,
   User,
+  Wallet,
   Percent,
   ShoppingCart,
   History,
   RotateCcw,
   CheckCircle,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { BarcodeScannerDialog } from "@/components/pos/BarcodeScannerDialog";
 import { ReceiptDialog } from "@/components/pos/ReceiptDialog";
 import { CustomerSelectDialog } from "@/components/pos/CustomerSelectDialog";
 import { PaymentDialog } from "@/components/pos/PaymentDialog";
+import { OpenDrawerDialog } from "@/components/cash-drawer/OpenDrawerDialog";
+import { RefundDialog } from "@/components/pos/RefundDialog";
+import { CloseDrawerDialog } from "@/components/cash-drawer/CloseDrawerDialog";
+import { useCashDrawer } from "@/hooks/useCashDrawer";
+import { Link } from "react-router-dom";
 
 interface CartItem {
   id: string;
@@ -78,12 +87,18 @@ export default function POS() {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [heldOrders, setHeldOrders] = useState<HeldOrder[]>([]);
   
+  // Cash drawer integration
+  const { activeDrawer, hasActiveDrawer, drawerBalance, recordSale, recordRefund, isRecordingSale } = useCashDrawer();
+  
   // Dialogs
   const [scannerOpen, setScannerOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [customerOpen, setCustomerOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [heldOrdersOpen, setHeldOrdersOpen] = useState(false);
+  const [openDrawerDialogOpen, setOpenDrawerDialogOpen] = useState(false);
+  const [refundDialogOpen, setRefundDialogOpen] = useState(false);
+  const [closeDrawerDialogOpen, setCloseDrawerDialogOpen] = useState(false);
   
   // Last completed sale for receipt
   const [lastSale, setLastSale] = useState<{
@@ -197,8 +212,22 @@ export default function POS() {
     setSelectedCustomer(null);
   };
 
-  const handlePaymentComplete = (method: string, amountPaid: number) => {
+  const handlePaymentComplete = async (method: string, amountPaid: number) => {
     const invoiceNumber = `INV-${Date.now().toString().slice(-8)}`;
+    
+    // Record cash sale to drawer if cash payment and drawer is open
+    if (method === "cash" && hasActiveDrawer) {
+      try {
+        await recordSale({
+          amount: total,
+          invoiceNumber,
+          paymentMethod: method,
+        });
+      } catch (error) {
+        console.error("Failed to record cash sale to drawer:", error);
+        // Continue with sale even if drawer recording fails
+      }
+    }
     
     setLastSale({
       cart: [...cart],
@@ -220,6 +249,27 @@ export default function POS() {
     toast.success("Sale completed successfully!");
   };
 
+  const handleRefundComplete = async (refundData: {
+    invoiceNumber: string;
+    amount: number;
+    reason: string;
+    paymentMethod: string;
+  }) => {
+    // Record cash refund to drawer if cash payment and drawer is open
+    if (refundData.paymentMethod === "cash" && hasActiveDrawer) {
+      try {
+        await recordRefund({
+          amount: refundData.amount,
+          invoiceNumber: refundData.invoiceNumber,
+        });
+      } catch (error) {
+        console.error("Failed to record refund to drawer:", error);
+      }
+    }
+    
+    toast.success(`Refund of $${refundData.amount.toFixed(2)} processed for ${refundData.invoiceNumber}`);
+  };
+
   const filteredProducts = sampleProducts.filter(
     (p) =>
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -228,7 +278,43 @@ export default function POS() {
   );
 
   return (
-    <div className="flex gap-4 h-[calc(100vh-7rem)]">
+    <div className="flex flex-col gap-4">
+      {/* Cash Drawer Status */}
+      {hasActiveDrawer ? (
+        <div className="flex items-center justify-between px-4 py-2 bg-secondary/50 rounded-lg border border-border">
+          <div className="flex items-center gap-2 text-sm">
+            <Wallet className="h-4 w-4 text-primary" />
+            <span className="text-muted-foreground">Cash Drawer:</span>
+            <span className="font-semibold text-foreground">${drawerBalance.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              Opened {new Date(activeDrawer.opened_at).toLocaleTimeString()}
+            </Badge>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCloseDrawerDialogOpen(true)}
+              className="h-7 text-xs"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Close Drawer
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>No active cash drawer. Cash sales will not be recorded to the drawer.</span>
+            <Button variant="outline" size="sm" onClick={() => setOpenDrawerDialogOpen(true)} className="ml-4">
+              Open Drawer
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <div className="flex gap-4 h-[calc(100vh-7rem)]">
       {/* Left Panel - Product Search & Cart */}
       <div className="flex-1 flex flex-col bg-card rounded-lg border border-border shadow-sm overflow-hidden">
         {/* Search Bar */}
@@ -499,7 +585,7 @@ export default function POS() {
             <CheckCircle className="h-5 w-5" />
             Pay ${total.toFixed(2)} (F4)
           </Button>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <Button 
               variant="outline" 
               size="sm" 
@@ -509,6 +595,15 @@ export default function POS() {
             >
               <Pause className="h-4 w-4" />
               Hold
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1 text-destructive hover:text-destructive"
+              onClick={() => setRefundDialogOpen(true)}
+            >
+              <RotateCcw className="h-4 w-4" />
+              Refund
             </Button>
             <Button 
               variant="outline" 
@@ -525,6 +620,7 @@ export default function POS() {
               Email
             </Button>
           </div>
+        </div>
         </div>
       </div>
 
@@ -565,6 +661,18 @@ export default function POS() {
         total={total}
       />
 
+      <OpenDrawerDialog
+        open={openDrawerDialogOpen}
+        onOpenChange={setOpenDrawerDialogOpen}
+      />
+
+      <RefundDialog
+        open={refundDialogOpen}
+        onClose={() => setRefundDialogOpen(false)}
+        onComplete={handleRefundComplete}
+        hasActiveDrawer={hasActiveDrawer}
+      />
+
       {/* Held Orders Dialog */}
       {heldOrdersOpen && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
@@ -600,6 +708,19 @@ export default function POS() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Close Drawer Dialog */}
+      {activeDrawer && (
+        <CloseDrawerDialog
+          open={closeDrawerDialogOpen}
+          onOpenChange={setCloseDrawerDialogOpen}
+          drawer={{
+            id: activeDrawer.id,
+            opening_float: activeDrawer.opening_float,
+          }}
+          expectedBalance={drawerBalance}
+        />
       )}
     </div>
   );
