@@ -11,16 +11,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Pencil, Trash2, Building2, MapPin, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-
-interface Branch {
-  id: string;
-  name: string;
-  address: string | null;
-  phone: string | null;
-  is_active: boolean;
-  created_at: string;
-}
+import { createBranch, deleteBranch, listBranches, updateBranch } from "@/features/branches/branches.api";
+import type { Branch, CreateBranchInput } from "@/features/branches/branches.types";
 
 const BranchSetup = () => {
   const { toast } = useToast();
@@ -33,6 +25,7 @@ const BranchSetup = () => {
   const [deleteBranchId, setDeleteBranchId] = useState<string | null>(null);
 
   // Form state
+  const [formCode, setFormCode] = useState("");
   const [formName, setFormName] = useState("");
   const [formAddress, setFormAddress] = useState("");
   const [formPhone, setFormPhone] = useState("");
@@ -42,14 +35,12 @@ const BranchSetup = () => {
     fetchBranches();
   }, []);
 
-  const fetchBranches = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("branches")
-        .select("*")
-        .order("created_at", { ascending: true });
+  const isBranchActive = (branch: Branch) => branch.isActive ?? true;
 
-      if (error) throw error;
+  const fetchBranches = async () => {
+    setLoading(true);
+    try {
+      const data = await listBranches({ includeDisabled: true });
       setBranches(data || []);
     } catch (error: any) {
       toast({
@@ -65,10 +56,11 @@ const BranchSetup = () => {
   const openDialog = (branch?: Branch) => {
     if (branch) {
       setEditingBranch(branch);
+      setFormCode(branch.code || "");
       setFormName(branch.name);
       setFormAddress(branch.address || "");
       setFormPhone(branch.phone || "");
-      setFormIsActive(branch.is_active);
+      setFormIsActive(branch.isActive ?? true);
     } else {
       resetForm();
     }
@@ -77,6 +69,7 @@ const BranchSetup = () => {
 
   const resetForm = () => {
     setEditingBranch(null);
+    setFormCode("");
     setFormName("");
     setFormAddress("");
     setFormPhone("");
@@ -84,6 +77,15 @@ const BranchSetup = () => {
   };
 
   const handleSave = async () => {
+    if (!formCode.trim()) {
+      toast({
+        title: "Validation error",
+        description: "Branch code is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!formName.trim()) {
       toast({
         title: "Validation error",
@@ -94,31 +96,23 @@ const BranchSetup = () => {
     }
 
     try {
-      const branchData = {
+      const branchData: CreateBranchInput = {
+        code: formCode.trim(),
         name: formName.trim(),
         address: formAddress.trim() || null,
         phone: formPhone.trim() || null,
-        is_active: formIsActive,
+        isActive: formIsActive,
       };
 
       if (editingBranch) {
-        const { error } = await supabase
-          .from("branches")
-          .update(branchData)
-          .eq("id", editingBranch.id);
-
-        if (error) throw error;
+        await updateBranch(editingBranch.id, branchData);
 
         toast({
           title: "Branch updated",
           description: `${branchData.name} has been updated successfully.`,
         });
       } else {
-        const { error } = await supabase
-          .from("branches")
-          .insert(branchData);
-
-        if (error) throw error;
+        await createBranch(branchData);
 
         toast({
           title: "Branch created",
@@ -142,12 +136,7 @@ const BranchSetup = () => {
     if (!deleteBranchId) return;
 
     try {
-      const { error } = await supabase
-        .from("branches")
-        .delete()
-        .eq("id", deleteBranchId);
-
-      if (error) throw error;
+      await deleteBranch(deleteBranchId);
 
       toast({
         title: "Branch deleted",
@@ -166,17 +155,15 @@ const BranchSetup = () => {
   };
 
   const toggleBranchStatus = async (branch: Branch) => {
-    try {
-      const { error } = await supabase
-        .from("branches")
-        .update({ is_active: !branch.is_active })
-        .eq("id", branch.id);
+    const wasActive = isBranchActive(branch);
+    const nextIsActive = !wasActive;
 
-      if (error) throw error;
+    try {
+      await updateBranch(branch.id, { isActive: nextIsActive });
 
       toast({
-        title: branch.is_active ? "Branch deactivated" : "Branch activated",
-        description: `${branch.name} is now ${branch.is_active ? "inactive" : "active"}.`,
+        title: wasActive ? "Branch deactivated" : "Branch activated",
+        description: `${branch.name} is now ${wasActive ? "inactive" : "active"}.`,
       });
 
       fetchBranches();
@@ -219,7 +206,7 @@ const BranchSetup = () => {
             <Building2 className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{branches.filter(b => b.is_active).length}</div>
+            <div className="text-2xl font-bold">{branches.filter((b) => isBranchActive(b)).length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -228,7 +215,7 @@ const BranchSetup = () => {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{branches.filter(b => !b.is_active).length}</div>
+            <div className="text-2xl font-bold">{branches.filter((b) => !isBranchActive(b)).length}</div>
           </CardContent>
         </Card>
       </div>
@@ -294,11 +281,11 @@ const BranchSetup = () => {
                     </TableCell>
                     <TableCell>
                       <Badge 
-                        variant={branch.is_active ? "default" : "secondary"}
+                        variant={isBranchActive(branch) ? "default" : "secondary"}
                         className="cursor-pointer"
                         onClick={() => toggleBranchStatus(branch)}
                       >
-                        {branch.is_active ? "Active" : "Inactive"}
+                        {isBranchActive(branch) ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -327,6 +314,15 @@ const BranchSetup = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="branchCode">Branch Code *</Label>
+              <Input
+                id="branchCode"
+                placeholder="e.g., MAIN, BR-001"
+                value={formCode}
+                onChange={(e) => setFormCode(e.target.value)}
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="branchName">Branch Name *</Label>
               <Input
