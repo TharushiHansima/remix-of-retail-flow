@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { listPublicBranches } from "@/features/branches/branches.api";
+import type { Branch } from "@/features/branches/branches.types";
 import { Loader2, Building2, Eye, EyeOff, CheckCircle2 } from "lucide-react";
 
 const loginSchema = z.object({
@@ -20,6 +22,7 @@ const signupSchema = z.object({
   fullName: z.string().trim().min(2, "Full name must be at least 2 characters"),
   email: z.string().trim().email("Invalid email address"),
   role: z.string().min(1, "Please select a role"),
+  branchId: z.string().min(1, "Please select a branch"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -31,7 +34,7 @@ const roles: { value: AppRole; label: string }[] = [
   { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
   { value: "cashier", label: "Cashier" },
-  { value: "storekeeper", label: "Store Keeper" },
+  { value: "store_keeper", label: "Store Keeper" },
   { value: "technician", label: "Technician" },
   { value: "accountant", label: "Accountant" },
 ];
@@ -40,21 +43,26 @@ export default function Auth() {
   const navigate = useNavigate();
   const { signIn, signUp, user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  
+
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
   const [signupSuccess, setSignupSuccess] = useState(false);
-  
+
+  // ✅ branches state
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginErrors, setLoginErrors] = useState<Record<string, string>>({});
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-  
+
   // Signup form state
   const [signupFullName, setSignupFullName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupRole, setSignupRole] = useState<string>("");
+  const [signupBranchId, setSignupBranchId] = useState<string>(""); // ✅ NEW
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [signupErrors, setSignupErrors] = useState<Record<string, string>>({});
@@ -68,30 +76,52 @@ export default function Auth() {
     }
   }, [user, authLoading, navigate]);
 
+  // ✅ load branches for signup dropdown (PUBLIC endpoint)
+  useEffect(() => {
+    const loadBranches = async () => {
+      try {
+        setBranchesLoading(true);
+
+        const data = await listPublicBranches();
+        const active = Array.isArray(data) ? data.filter((b) => b.isActive ?? true) : [];
+        setBranches(active);
+      } catch (err: any) {
+        console.error("Failed to load branches:", err);
+        toast({
+          variant: "destructive",
+          title: "Branches not loaded",
+          description: err?.message || "Could not load branches.",
+        });
+      } finally {
+        setBranchesLoading(false);
+      }
+    };
+
+    void loadBranches();
+  }, [toast]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginErrors({});
-    
+
     const result = loginSchema.safeParse({
       email: loginEmail,
       password: loginPassword,
     });
-    
+
     if (!result.success) {
       const errors: Record<string, string> = {};
       result.error.errors.forEach((err) => {
-        if (err.path[0]) {
-          errors[err.path[0] as string] = err.message;
-        }
+        if (err.path[0]) errors[err.path[0] as string] = err.message;
       });
       setLoginErrors(errors);
       return;
     }
-    
+
     setIsLoading(true);
     const { error } = await signIn(loginEmail, loginPassword);
     setIsLoading(false);
-    
+
     if (error) {
       toast({
         variant: "destructive",
@@ -110,30 +140,35 @@ export default function Auth() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignupErrors({});
-    
+
     const result = signupSchema.safeParse({
       fullName: signupFullName,
       email: signupEmail,
       role: signupRole,
+      branchId: signupBranchId,
       password: signupPassword,
       confirmPassword: signupConfirmPassword,
     });
-    
+
     if (!result.success) {
       const errors: Record<string, string> = {};
       result.error.errors.forEach((err) => {
-        if (err.path[0]) {
-          errors[err.path[0] as string] = err.message;
-        }
+        if (err.path[0]) errors[err.path[0] as string] = err.message;
       });
       setSignupErrors(errors);
       return;
     }
-    
+
     setIsLoading(true);
-    const { error } = await signUp(signupEmail, signupPassword, signupFullName, signupRole as AppRole);
+    const { error } = await signUp(
+      signupEmail,
+      signupPassword,
+      signupFullName,
+      signupRole as AppRole,
+      signupBranchId
+    );
     setIsLoading(false);
-    
+
     if (error) {
       toast({
         variant: "destructive",
@@ -149,6 +184,7 @@ export default function Auth() {
     setSignupFullName("");
     setSignupEmail("");
     setSignupRole("");
+    setSignupBranchId("");
     setSignupPassword("");
     setSignupConfirmPassword("");
     setSignupErrors({});
@@ -172,17 +208,16 @@ export default function Auth() {
             <Building2 className="h-6 w-6 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl font-bold">DevLabCo ERP</CardTitle>
-          <CardDescription>
-            Retail & Service Management System
-          </CardDescription>
+          <CardDescription>Retail & Service Management System</CardDescription>
         </CardHeader>
+
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2 mb-6">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -195,10 +230,9 @@ export default function Auth() {
                     onChange={(e) => setLoginEmail(e.target.value)}
                     disabled={isLoading}
                   />
-                  {loginErrors.email && (
-                    <p className="text-sm text-destructive">{loginErrors.email}</p>
-                  )}
+                  {loginErrors.email && <p className="text-sm text-destructive">{loginErrors.email}</p>}
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="login-password">Password</Label>
                   <div className="relative">
@@ -226,15 +260,15 @@ export default function Auth() {
                       )}
                     </Button>
                   </div>
-                  {loginErrors.password && (
-                    <p className="text-sm text-destructive">{loginErrors.password}</p>
-                  )}
+                  {loginErrors.password && <p className="text-sm text-destructive">{loginErrors.password}</p>}
                 </div>
+
                 <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
                   <p className="font-medium mb-1">Demo Admin Account:</p>
                   <p>Email: admin@devlabco.com</p>
                   <p>Password: admin123</p>
                 </div>
+
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
                     <>
@@ -247,7 +281,7 @@ export default function Auth() {
                 </Button>
               </form>
             </TabsContent>
-            
+
             <TabsContent value="signup">
               {signupSuccess ? (
                 <div className="text-center space-y-4 py-6">
@@ -276,10 +310,9 @@ export default function Auth() {
                       onChange={(e) => setSignupFullName(e.target.value)}
                       disabled={isLoading}
                     />
-                    {signupErrors.fullName && (
-                      <p className="text-sm text-destructive">{signupErrors.fullName}</p>
-                    )}
+                    {signupErrors.fullName && <p className="text-sm text-destructive">{signupErrors.fullName}</p>}
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="signup-email">Email</Label>
                     <Input
@@ -290,10 +323,9 @@ export default function Auth() {
                       onChange={(e) => setSignupEmail(e.target.value)}
                       disabled={isLoading}
                     />
-                    {signupErrors.email && (
-                      <p className="text-sm text-destructive">{signupErrors.email}</p>
-                    )}
+                    {signupErrors.email && <p className="text-sm text-destructive">{signupErrors.email}</p>}
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="signup-role">Role</Label>
                     <Select value={signupRole} onValueChange={setSignupRole} disabled={isLoading}>
@@ -308,10 +340,31 @@ export default function Auth() {
                         ))}
                       </SelectContent>
                     </Select>
-                    {signupErrors.role && (
-                      <p className="text-sm text-destructive">{signupErrors.role}</p>
-                    )}
+                    {signupErrors.role && <p className="text-sm text-destructive">{signupErrors.role}</p>}
                   </div>
+
+                  {/* ✅ Branch dropdown (only added) */}
+                  <div className="space-y-2">
+                    <Label htmlFor="signup-branch">Branch</Label>
+                    <Select
+                      value={signupBranchId}
+                      onValueChange={setSignupBranchId}
+                      disabled={isLoading || branchesLoading}
+                    >
+                      <SelectTrigger id="signup-branch">
+                        <SelectValue placeholder={branchesLoading ? "Loading branches..." : "Select branch"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branches.map((b) => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {signupErrors.branchId && <p className="text-sm text-destructive">{signupErrors.branchId}</p>}
+                  </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="signup-password">Password</Label>
                     <div className="relative">
@@ -339,10 +392,9 @@ export default function Auth() {
                         )}
                       </Button>
                     </div>
-                    {signupErrors.password && (
-                      <p className="text-sm text-destructive">{signupErrors.password}</p>
-                    )}
+                    {signupErrors.password && <p className="text-sm text-destructive">{signupErrors.password}</p>}
                   </div>
+
                   <div className="space-y-2">
                     <Label htmlFor="signup-confirm">Confirm Password</Label>
                     <div className="relative">
@@ -374,6 +426,7 @@ export default function Auth() {
                       <p className="text-sm text-destructive">{signupErrors.confirmPassword}</p>
                     )}
                   </div>
+
                   <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? (
                       <>
