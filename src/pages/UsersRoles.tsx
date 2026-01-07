@@ -34,28 +34,27 @@ import {
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { ModuleGuard } from "@/components/layout/ModuleGuard";
 import { format } from "date-fns";
 
-interface UserWithRoles {
-  id: string;
-  user_id: string;
-  email: string;
-  full_name: string | null;
-  created_at: string;
-  roles: string[];
-}
 
-const AVAILABLE_ROLES = ["admin", "manager", "cashier", "technician"] as const;
+
+// ✅ NEW: backend API
+import { listUsers } from "@/features/users/users.api";
+import type { UserWithRoles } from "@/features/users/users.types";
+import { updateUserRole } from "@/features/users/users.api";
+
+const AVAILABLE_ROLES = ["admin", "manager", "cashier", "technician","accountant","store_keeper"] as const;
 
 export default function UsersRoles() {
   const { hasRole } = useAuth();
+
   const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null);
   const [isRoleDialogOpen, setIsRoleDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>("");
@@ -65,44 +64,16 @@ export default function UsersRoles() {
 
   useEffect(() => {
     fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchUsers = async () => {
     try {
       setIsLoading(true);
-      
-      // Fetch profiles
-      const { data: profiles, error: profilesError } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
 
-      if (profilesError) throw profilesError;
-
-      // Fetch all user roles
-      const { data: allRoles, error: rolesError } = await supabase
-        .from("user_roles")
-        .select("*");
-
-      if (rolesError) throw rolesError;
-
-      // Combine profiles with their roles
-      const usersWithRoles: UserWithRoles[] = (profiles || []).map((profile) => {
-        const userRoles = (allRoles || [])
-          .filter((r) => r.user_id === profile.user_id)
-          .map((r) => r.role);
-        
-        return {
-          id: profile.id,
-          user_id: profile.user_id,
-          email: profile.email,
-          full_name: profile.full_name,
-          created_at: profile.created_at,
-          roles: userRoles,
-        };
-      });
-
-      setUsers(usersWithRoles);
+      // backend: GET /users
+      const data = await listUsers({ includeDisabled: false });
+      setUsers(data);
     } catch (error) {
       console.error("Error fetching users:", error);
       toast.error("Failed to load users");
@@ -118,39 +89,27 @@ export default function UsersRoles() {
   };
 
   const handleSaveRole = async () => {
-    if (!selectedUser || !selectedRole) return;
+  if (!selectedUser || !selectedRole) return;
 
-    try {
-      setIsSaving(true);
+  try {
+    setIsSaving(true);
 
-      // Delete existing roles for this user
-      const { error: deleteError } = await supabase
-        .from("user_roles")
-        .delete()
-        .eq("user_id", selectedUser.user_id);
+    // IMPORTANT:
+    // selectedUser.user_id = actual backend User.id
+    await updateUserRole(selectedUser.user_id, selectedRole);
 
-      if (deleteError) throw deleteError;
+    toast.success("Role updated successfully");
+    setIsRoleDialogOpen(false);
 
-      // Insert new role
-      const { error: insertError } = await supabase
-        .from("user_roles")
-        .insert({
-          user_id: selectedUser.user_id,
-          role: selectedRole as "admin" | "manager" | "cashier" | "technician",
-        });
+    await fetchUsers(); // refresh list + stats
+  } catch (error: any) {
+    console.error("Error updating role:", error);
+    toast.error(error?.message || "Failed to update role");
+  } finally {
+    setIsSaving(false);
+  }
+};
 
-      if (insertError) throw insertError;
-
-      toast.success("Role updated successfully");
-      setIsRoleDialogOpen(false);
-      fetchUsers();
-    } catch (error) {
-      console.error("Error updating role:", error);
-      toast.error("Failed to update role");
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const filteredUsers = users.filter(
     (u) =>
@@ -250,14 +209,12 @@ export default function UsersRoles() {
                             </div>
                           </div>
                         </TableCell>
+
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
                             {user.roles.length > 0 ? (
                               user.roles.map((role) => (
-                                <Badge
-                                  key={role}
-                                  variant={getRoleBadgeVariant(role)}
-                                >
+                                <Badge key={role} variant={getRoleBadgeVariant(role)}>
                                   {role}
                                 </Badge>
                               ))
@@ -266,9 +223,11 @@ export default function UsersRoles() {
                             )}
                           </div>
                         </TableCell>
+
                         <TableCell className="text-muted-foreground text-sm">
                           {format(new Date(user.created_at), "MMM d, yyyy")}
                         </TableCell>
+
                         {isAdmin && (
                           <TableCell>
                             <DropdownMenu>
@@ -300,10 +259,7 @@ export default function UsersRoles() {
 
             <div className="bg-card rounded-lg border border-border shadow-sm divide-y divide-border">
               {roleStats.map((role) => (
-                <div
-                  key={role.name}
-                  className="p-4 flex items-center justify-between"
-                >
+                <div key={role.name} className="p-4 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
                       <Shield className="h-4 w-4 text-primary" />
@@ -330,6 +286,7 @@ export default function UsersRoles() {
                 Change the role for {selectedUser?.full_name || selectedUser?.email}
               </DialogDescription>
             </DialogHeader>
+
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Role</Label>
@@ -347,6 +304,7 @@ export default function UsersRoles() {
                 </Select>
               </div>
             </div>
+
             <DialogFooter>
               <Button
                 variant="outline"

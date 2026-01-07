@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 
-export type AppRole = "admin" | "manager" | "cashier" | "storekeeper" | "technician" | "accountant";
+export type AppRole = "admin" | "manager" | "cashier" | "store_keeper" | "technician" | "accountant";
 
 interface Profile {
   id: string;
