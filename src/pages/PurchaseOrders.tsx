@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
@@ -33,6 +33,13 @@ import { CreatePurchaseOrderDialog } from "@/components/purchase-orders/CreatePu
 import { ViewPurchaseOrderDialog } from "@/components/purchase-orders/ViewPurchaseOrderDialog";
 import { EditPurchaseOrderDialog } from "@/components/purchase-orders/EditPurchaseOrderDialog";
 import { CreateGRNDialog } from "@/components/purchase-orders/CreateGRNDialog";
+import { toast } from "sonner";
+
+import { listPurchaseOrders } from "@/features/procurement/purchase-orders/purchase-orders.api";
+import type {
+  PurchaseOrder as ApiPO,
+  PurchaseOrderStatus as ApiPOStatus,
+} from "@/features/procurement/purchase-orders/purchase-orders.types";
 
 interface PurchaseOrder {
   id: string;
@@ -45,159 +52,6 @@ interface PurchaseOrder {
   status: "draft" | "pending" | "approved" | "shipped" | "received" | "partial";
 }
 
-const orders: PurchaseOrder[] = [
-  {
-    id: "1",
-    poNumber: "PO-2024-0125",
-    supplier: "Apple Inc.",
-    orderDate: "2024-01-25",
-    expectedDate: "2024-02-05",
-    items: 15,
-    totalValue: 125000,
-    status: "shipped",
-  },
-  {
-    id: "2",
-    poNumber: "PO-2024-0124",
-    supplier: "Samsung Electronics",
-    orderDate: "2024-01-24",
-    expectedDate: "2024-02-01",
-    items: 25,
-    totalValue: 85000,
-    status: "approved",
-  },
-  {
-    id: "3",
-    poNumber: "PO-2024-0123",
-    supplier: "Generic Accessories Ltd",
-    orderDate: "2024-01-22",
-    expectedDate: "2024-01-28",
-    items: 100,
-    totalValue: 12500,
-    status: "received",
-  },
-  {
-    id: "4",
-    poNumber: "PO-2024-0122",
-    supplier: "Tech Distributors Inc",
-    orderDate: "2024-01-20",
-    expectedDate: "2024-01-30",
-    items: 8,
-    totalValue: 45000,
-    status: "partial",
-  },
-  {
-    id: "5",
-    poNumber: "PO-2024-0126",
-    supplier: "Mobile Accessories Co",
-    orderDate: "2024-01-26",
-    expectedDate: "2024-02-10",
-    items: 50,
-    totalValue: 8500,
-    status: "pending",
-  },
-  {
-    id: "6",
-    poNumber: "PO-2024-0127",
-    supplier: "Sony Corporation",
-    orderDate: "2024-01-27",
-    expectedDate: "2024-02-12",
-    items: 20,
-    totalValue: 62000,
-    status: "draft",
-  },
-  {
-    id: "7",
-    poNumber: "PO-2024-0128",
-    supplier: "Dell Technologies",
-    orderDate: "2024-01-28",
-    expectedDate: "2024-02-15",
-    items: 12,
-    totalValue: 78500,
-    status: "pending",
-  },
-  {
-    id: "8",
-    poNumber: "PO-2024-0129",
-    supplier: "Logitech International",
-    orderDate: "2024-01-29",
-    expectedDate: "2024-02-08",
-    items: 45,
-    totalValue: 15600,
-    status: "approved",
-  },
-  {
-    id: "9",
-    poNumber: "PO-2024-0130",
-    supplier: "Anker Innovations",
-    orderDate: "2024-01-30",
-    expectedDate: "2024-02-12",
-    items: 80,
-    totalValue: 9200,
-    status: "shipped",
-  },
-  {
-    id: "10",
-    poNumber: "PO-2024-0131",
-    supplier: "Google Hardware",
-    orderDate: "2024-01-31",
-    expectedDate: "2024-02-18",
-    items: 18,
-    totalValue: 54000,
-    status: "pending",
-  },
-  {
-    id: "11",
-    poNumber: "PO-2024-0132",
-    supplier: "Lenovo Group",
-    orderDate: "2024-02-01",
-    expectedDate: "2024-02-20",
-    items: 10,
-    totalValue: 48000,
-    status: "approved",
-  },
-  {
-    id: "12",
-    poNumber: "PO-2024-0133",
-    supplier: "TP-Link Technologies",
-    orderDate: "2024-02-02",
-    expectedDate: "2024-02-16",
-    items: 35,
-    totalValue: 12800,
-    status: "received",
-  },
-  {
-    id: "13",
-    poNumber: "PO-2024-0134",
-    supplier: "Bose Corporation",
-    orderDate: "2024-02-03",
-    expectedDate: "2024-02-22",
-    items: 15,
-    totalValue: 28500,
-    status: "partial",
-  },
-  {
-    id: "14",
-    poNumber: "PO-2024-0135",
-    supplier: "OnePlus Technology",
-    orderDate: "2024-02-04",
-    expectedDate: "2024-02-25",
-    items: 22,
-    totalValue: 66000,
-    status: "draft",
-  },
-  {
-    id: "15",
-    poNumber: "PO-2024-0136",
-    supplier: "Nintendo Co.",
-    orderDate: "2024-02-05",
-    expectedDate: "2024-02-28",
-    items: 30,
-    totalValue: 42000,
-    status: "pending",
-  },
-];
-
 const statusConfig = {
   draft: { label: "Draft", color: "bg-muted text-muted-foreground", icon: FileText },
   pending: { label: "Pending", color: "bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))]", icon: Clock },
@@ -207,19 +61,141 @@ const statusConfig = {
   partial: { label: "Partial", color: "bg-[hsl(var(--chart-4))]/10 text-[hsl(var(--chart-4))]", icon: Package },
 };
 
+function toNumber(v: unknown): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function formatDate(d?: string | null) {
+  if (!d) return "-";
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return "-";
+  // keep same style as your dummy (yyyy-mm-dd)
+  return dt.toISOString().slice(0, 10);
+}
+
+function mapBackendStatusToUi(s: ApiPOStatus): PurchaseOrder["status"] {
+  switch (s) {
+    case "draft":
+      return "draft";
+    case "pending_approval":
+      return "pending";
+    case "approved":
+      return "approved";
+    case "partially_received":
+      return "partial";
+    case "received":
+      return "received";
+    // backend has cancelled - UI has no "cancelled"
+    case "cancelled":
+    default:
+      return "draft";
+  }
+}
+
+// Tabs -> backend status filter
+function mapTabToBackendStatus(tab: string): ApiPOStatus | undefined {
+  switch (tab) {
+    case "pending":
+      return "pending_approval";
+    case "shipped":
+      // your backend doesn’t have "shipped"; best match is "approved"
+      return "approved";
+    case "received":
+      return "received";
+    default:
+      return undefined; // all
+  }
+}
+
+function normalizeFindAll(res: any): { data: ApiPO[]; total: number } {
+  if (res?.data && Array.isArray(res.data)) {
+    return { data: res.data, total: Number(res?.meta?.total ?? res.data.length) };
+  }
+  if (Array.isArray(res)) return { data: res, total: res.length };
+  return { data: [], total: 0 };
+}
+
 export default function PurchaseOrders() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [tab, setTab] = useState("all");
+
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isGRNDialogOpen, setIsGRNDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<PurchaseOrder | null>(null);
 
-  const filteredOrders = orders.filter(
-    (o) =>
-      o.poNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.supplier.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const [orders, setOrders] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+
+    const t = setTimeout(() => {
+      void (async () => {
+        try {
+          setLoading(true);
+
+          const status = mapTabToBackendStatus(tab);
+
+          const res = await listPurchaseOrders({
+            q: searchQuery.trim() ? searchQuery.trim() : undefined,
+            status,
+            page: 1,
+            pageSize: 50,
+          });
+
+          const { data } = normalizeFindAll(res);
+
+          const mapped: PurchaseOrder[] = data.map((po) => {
+            const qtySum = (po.items ?? []).reduce((sum, it) => sum + toNumber(it.quantity), 0);
+
+            return {
+              id: po.id,
+              poNumber: po.poNumber,
+              supplier: po.supplier?.name ?? "-",
+              orderDate: formatDate(po.createdAt),
+              expectedDate: formatDate(po.expectedDate),
+              items: qtySum,
+              totalValue: toNumber(po.totalAmount),
+              status: mapBackendStatusToUi(po.status),
+            };
+          });
+
+          if (!alive) return;
+          setOrders(mapped);
+        } catch (e: any) {
+          if (!alive) return;
+          toast.error(e?.message || "Failed to load purchase orders");
+          setOrders([]);
+        } finally {
+          if (alive) setLoading(false);
+        }
+      })();
+    }, 250);
+
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [searchQuery, tab]);
+
+  // Keep your UI search filtering behavior too (optional extra safety)
+  const filteredOrders = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return orders;
+    return orders.filter(
+      (o) =>
+        o.poNumber.toLowerCase().includes(q) ||
+        o.supplier.toLowerCase().includes(q)
+    );
+  }, [orders, searchQuery]);
 
   const handleViewDetails = (order: PurchaseOrder) => {
     setSelectedOrder(order);
@@ -272,7 +248,7 @@ export default function PurchaseOrders() {
       />
 
       {/* Status Tabs */}
-      <Tabs defaultValue="all">
+      <Tabs value={tab} onValueChange={setTab}>
         <div className="flex items-center justify-between">
           <TabsList className="bg-muted">
             <TabsTrigger value="all">All Orders</TabsTrigger>
@@ -308,51 +284,62 @@ export default function PurchaseOrders() {
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
-            {filteredOrders.map((order) => {
-              const StatusIcon = statusConfig[order.status].icon;
-              return (
-                <TableRow key={order.id} className="hover:bg-muted/30">
-                  <TableCell className="font-mono font-medium">{order.poNumber}</TableCell>
-                  <TableCell>{order.supplier}</TableCell>
-                  <TableCell className="text-muted-foreground">{order.orderDate}</TableCell>
-                  <TableCell className="text-muted-foreground">{order.expectedDate}</TableCell>
-                  <TableCell className="text-center">{order.items}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    ${order.totalValue.toLocaleString()}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`gap-1 ${statusConfig[order.status].color}`}>
-                      <StatusIcon className="h-3 w-3" />
-                      {statusConfig[order.status].label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-popover">
-                        <DropdownMenuItem onClick={() => handleViewDetails(order)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleEditOrder(order)}>
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Order
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleCreateGRN(order)}>
-                          <Package className="mr-2 h-4 w-4" />
-                          Create GRN
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={8}>Loading...</TableCell>
+              </TableRow>
+            ) : filteredOrders.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8}>No purchase orders found</TableCell>
+              </TableRow>
+            ) : (
+              filteredOrders.map((order) => {
+                const StatusIcon = statusConfig[order.status].icon;
+                return (
+                  <TableRow key={order.id} className="hover:bg-muted/30">
+                    <TableCell className="font-mono font-medium">{order.poNumber}</TableCell>
+                    <TableCell>{order.supplier}</TableCell>
+                    <TableCell className="text-muted-foreground">{order.orderDate}</TableCell>
+                    <TableCell className="text-muted-foreground">{order.expectedDate}</TableCell>
+                    <TableCell className="text-center">{order.items}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      ${order.totalValue.toLocaleString()}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`gap-1 ${statusConfig[order.status].color}`}>
+                        <StatusIcon className="h-3 w-3" />
+                        {statusConfig[order.status].label}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-popover">
+                          <DropdownMenuItem onClick={() => handleViewDetails(order)}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit Order
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleCreateGRN(order)}>
+                            <Package className="mr-2 h-4 w-4" />
+                            Create GRN
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </div>

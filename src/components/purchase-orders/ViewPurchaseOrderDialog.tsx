@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,13 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import {
-  FileText,
-  Truck,
-  CheckCircle2,
-  Clock,
-  Package,
-} from "lucide-react";
+import { FileText, Truck, CheckCircle2, Clock, Package } from "lucide-react";
+import { http } from "@/lib/http";
 
 interface PurchaseOrder {
   id: string;
@@ -42,12 +38,37 @@ const statusConfig = {
   partial: { label: "Partial", color: "bg-[hsl(var(--chart-4))]/10 text-[hsl(var(--chart-4))]", icon: Package },
 };
 
-// Mock line items for display
-const mockLineItems = [
-  { id: "1", product: "iPhone 15 Pro 256GB", sku: "IP15P-256", quantity: 10, unitCost: 999, received: 0 },
-  { id: "2", product: "USB-C Cable 2m", sku: "ACC-USBC-2M", quantity: 50, unitCost: 15, received: 0 },
-  { id: "3", product: "Phone Case Clear", sku: "ACC-CASE-CLR", quantity: 100, unitCost: 12, received: 0 },
-];
+type ApiPurchaseOrderDetail = {
+  id: string;
+  poNumber?: string;
+  createdAt?: string;
+  expectedDate?: string;
+  status?: string;
+  supplier?: { id: string; name: string } | null;
+  items?: Array<{
+    id: string;
+    productId: string;
+    quantity: number;
+    unitCost: number | string;
+    product?: { id: string; name: string; sku?: string | null } | null;
+  }>;
+};
+
+function toNumber(v: unknown): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function formatDate(iso?: string) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toISOString().slice(0, 10);
+}
 
 interface ViewPurchaseOrderDialogProps {
   open: boolean;
@@ -60,9 +81,49 @@ export function ViewPurchaseOrderDialog({
   onOpenChange,
   order,
 }: ViewPurchaseOrderDialogProps) {
+  const [detail, setDetail] = useState<ApiPurchaseOrderDetail | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    if (!open || !order?.id) return;
+
+    void (async () => {
+      try {
+        setLoading(true);
+        const res = await http<ApiPurchaseOrderDetail>(
+          `/procurement/purchase-orders/${order.id}`,
+          { method: "GET", auth: true }
+        );
+        if (!alive) return;
+        setDetail(res ?? null);
+      } catch {
+        if (!alive) return;
+        setDetail(null);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [open, order?.id]);
+
   if (!order) return null;
 
-  const StatusIcon = statusConfig[order.status].icon;
+  const statusKey = (detail?.status as PurchaseOrder["status"]) || order.status;
+  const StatusIcon = statusConfig[statusKey].icon;
+
+  const lineItems = detail?.items ?? [];
+  const computedTotal = useMemo(() => {
+    return lineItems.reduce(
+      (sum, it) => sum + toNumber(it.unitCost) * Number(it.quantity ?? 0),
+      0
+    );
+  }, [lineItems]);
+
+  const subtotal = computedTotal || order.totalValue;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -70,9 +131,9 @@ export function ViewPurchaseOrderDialog({
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl">{order.poNumber}</DialogTitle>
-            <Badge className={`gap-1 ${statusConfig[order.status].color}`}>
+            <Badge className={`gap-1 ${statusConfig[statusKey].color}`}>
               <StatusIcon className="h-3 w-3" />
-              {statusConfig[order.status].label}
+              {statusConfig[statusKey].label}
             </Badge>
           </div>
         </DialogHeader>
@@ -82,19 +143,29 @@ export function ViewPurchaseOrderDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Supplier</p>
-              <p className="font-medium">{order.supplier}</p>
+              <p className="font-medium">
+                {detail?.supplier?.name || order.supplier}
+              </p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Order Date</p>
-              <p className="font-medium">{order.orderDate}</p>
+              <p className="font-medium">
+                {detail?.createdAt ? formatDate(detail.createdAt) : order.orderDate}
+              </p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Expected Delivery</p>
-              <p className="font-medium">{order.expectedDate}</p>
+              <p className="font-medium">
+                {detail?.expectedDate ? formatDate(detail.expectedDate) : order.expectedDate}
+              </p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Total Items</p>
-              <p className="font-medium">{order.items}</p>
+              <p className="font-medium">
+                {lineItems.length > 0
+                  ? lineItems.reduce((sum, it) => sum + Number(it.quantity ?? 0), 0)
+                  : order.items}
+              </p>
             </div>
           </div>
 
@@ -115,21 +186,37 @@ export function ViewPurchaseOrderDialog({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockLineItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.product}</TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">
-                        {item.sku}
-                      </TableCell>
-                      <TableCell className="text-center">{item.quantity}</TableCell>
-                      <TableCell className="text-right">
-                        ${item.unitCost.toLocaleString()}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        ${(item.quantity * item.unitCost).toLocaleString()}
-                      </TableCell>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={5}>Loading...</TableCell>
                     </TableRow>
-                  ))}
+                  ) : lineItems.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5}>No items</TableCell>
+                    </TableRow>
+                  ) : (
+                    lineItems.map((it) => {
+                      const qty = Number(it.quantity ?? 0);
+                      const unit = toNumber(it.unitCost);
+                      return (
+                        <TableRow key={it.id}>
+                          <TableCell className="font-medium">
+                            {it.product?.name ?? "Unknown product"}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm text-muted-foreground">
+                            {it.product?.sku ?? "-"}
+                          </TableCell>
+                          <TableCell className="text-center">{qty}</TableCell>
+                          <TableCell className="text-right">
+                            ${unit.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            ${(qty * unit).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -142,7 +229,7 @@ export function ViewPurchaseOrderDialog({
             <div className="w-64 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal</span>
-                <span>${order.totalValue.toLocaleString()}</span>
+                <span>${subtotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Tax (0%)</span>
@@ -151,7 +238,7 @@ export function ViewPurchaseOrderDialog({
               <Separator />
               <div className="flex justify-between font-medium">
                 <span>Total</span>
-                <span className="text-lg">${order.totalValue.toLocaleString()}</span>
+                <span className="text-lg">${subtotal.toLocaleString()}</span>
               </div>
             </div>
           </div>
