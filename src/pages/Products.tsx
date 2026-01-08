@@ -71,6 +71,10 @@ interface Product {
   type: "standard" | "serialized" | "batch";
   price: number;
   cost: number;
+
+  // ✅ added (so mapApiProductToUi compiles and View/Edit dialogs can receive it)
+  wholesalePrice: number;
+
   stock: {
     main: number;
     downtown: number;
@@ -126,7 +130,24 @@ function mapApiProductToUi(
     (categoryId ? lookups.categoryById.get(categoryId) : undefined) ||
     "-";
 
-  const status: Product["status"] = p.isActive === false ? "inactive" : "active";
+  const branches = (p as any).branches ?? [];
+  const stock = { main: 0, downtown: 0, warehouse: 0 };
+  let lowStock = false;
+
+  for (const pb of branches) {
+    const qty = Number(pb?.stockQty ?? 0);
+    const min = Number(pb?.minStock ?? 0);
+    const branchName = (pb?.branch?.name ?? "").toLowerCase();
+
+    if (branchName.includes("downtown")) stock.downtown += qty;
+    else if (branchName.includes("warehouse")) stock.warehouse += qty;
+    else stock.main += qty; // default bucket (your “Main”)
+
+    if (min > 0 && qty < min) lowStock = true;
+  }
+
+  const status: Product["status"] =
+    p.isActive === false ? "inactive" : lowStock ? "low_stock" : "active";
 
   return {
     id: p.id,
@@ -138,10 +159,9 @@ function mapApiProductToUi(
     brandId,
     type,
     price: toNumber(p.unitPrice ?? p.sellingPrice),
+    wholesalePrice: toNumber((p as any).wholesalePrice), // ✅ add
     cost: toNumber(p.costPrice),
-    // stock is not provided by this controller; keep zeros for now
-    stock: { main: 0, downtown: 0, warehouse: 0 },
-    // low_stock requires stock module; keep active/inactive only
+    stock, // ✅ from branches
     status,
   };
 }
@@ -167,7 +187,6 @@ function normalizeListResponse(res: any): { items: ApiProduct[]; total: number }
 
   return { items: [], total: 0 };
 }
-
 
 export default function Products() {
   const { categories } = useCategories();
