@@ -88,6 +88,24 @@ export function AddProductDialog({
     const costPrice = toOptionalNumber(formData.costPrice);
     if (costPrice !== undefined) dto.costPrice = costPrice;
 
+    const wholesalePrice = toOptionalNumber(formData.wholesalePrice);
+    if (wholesalePrice !== undefined) dto.wholesalePrice = wholesalePrice;
+
+    const minStockLevel = toOptionalNumber(formData.minStockLevel);
+    if (minStockLevel !== undefined) dto.minStockLevel = minStockLevel;
+
+    const maxStockLevel = toOptionalNumber(formData.maxStockLevel);
+    if (formData.maxStockLevel.trim() === "") {
+  // leave undefined
+    } else if (maxStockLevel !== undefined) {
+    dto.maxStockLevel = maxStockLevel;
+    }
+
+    const reorderQty = toOptionalNumber(formData.reorderQuantity);
+    if (reorderQty !== undefined) dto.reorderQty = reorderQty;
+
+    dto.isActive = formData.isActive;
+
     try {
       const ok = await onSubmit(dto);
       if (ok) {
