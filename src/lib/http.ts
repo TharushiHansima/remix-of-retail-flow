@@ -10,8 +10,16 @@ const BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000")
 
 const ACCESS_TOKEN_KEY = "erp.accessToken";
 
+// ✅ NEW: branch selection key (same key used in AppHeader)
+const BRANCH_ID_KEY = "erp.branchId";
+
 function getToken() {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+// ✅ NEW: get selected branch id
+function getBranchId() {
+  return localStorage.getItem(BRANCH_ID_KEY);
 }
 
 function parseMessage(data: any): string {
@@ -37,6 +45,12 @@ export async function http<T>(
   if (options.auth) {
     const token = getToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  // ✅ NEW: attach selected branch to every request (if available)
+  const branchId = getBranchId();
+  if (branchId) {
+    headers.set("X-Branch-Id", branchId);
   }
 
   const res = await fetch(url, {

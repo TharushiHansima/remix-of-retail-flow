@@ -54,6 +54,7 @@ type ApiBrand = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  productCount?: number;
 };
 
 type ApiCategory = {
@@ -63,6 +64,7 @@ type ApiCategory = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  productCount?: number;
 };
 
 function getAuthHeader() {
@@ -170,7 +172,7 @@ export default function CategoriesBrands() {
             id: c.id,
             name: c.name,
             parentId: c.parentId ?? null,
-            productCount: 0, // backend not sending productCount
+            productCount: c.productCount ?? 0,
           })),
         );
 
@@ -178,7 +180,7 @@ export default function CategoriesBrands() {
           brs.map((b) => ({
             id: b.id,
             name: b.name,
-            productCount: 0, // backend not sending productCount
+            productCount: b.productCount ?? 0,
           })),
         );
       } catch (e: any) {
@@ -526,9 +528,15 @@ export default function CategoriesBrands() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None (Root Category)</SelectItem>
-                  {parentCategories.filter(c => c.id !== editingCategory?.id).map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
+                  {parentCategories.map((cat) => (
+                  <SelectItem
+                    key={cat.id}
+                    value={cat.id}
+                    disabled={cat.id === editingCategory?.id}
+                      >
+                    {cat.name}{cat.id === editingCategory?.id ? " (current)" : ""}
+                  </SelectItem>
+                ))}
                 </SelectContent>
               </Select>
             </div>

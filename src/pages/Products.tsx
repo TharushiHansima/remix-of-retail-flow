@@ -146,10 +146,28 @@ function mapApiProductToUi(
   };
 }
 
-function normalizeListResponse(res: ProductListResponse): { items: ApiProduct[]; total: number } {
+function normalizeListResponse(res: any): { items: ApiProduct[]; total: number } {
   if (Array.isArray(res)) return { items: res, total: res.length };
-  return { items: res.items || [], total: res.total ?? res.items?.length ?? 0 };
+
+  // backend style: { data, meta }
+  if (res?.data && Array.isArray(res.data)) {
+    return {
+      items: res.data,
+      total: Number(res?.meta?.total ?? res.data.length),
+    };
+  }
+
+  // older UI style: { items, total }
+  if (res?.items && Array.isArray(res.items)) {
+    return {
+      items: res.items,
+      total: Number(res?.total ?? res.items.length),
+    };
+  }
+
+  return { items: [], total: 0 };
 }
+
 
 export default function Products() {
   const { categories } = useCategories();
