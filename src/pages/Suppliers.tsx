@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,14 +11,102 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Pencil, Trash2, Building2, Phone, Mail, User } from "lucide-react";
 import { toast } from "sonner";
-import { mockSuppliers, type Supplier } from "@/data/mockData";
+
+import {
+  createSupplier,
+  disableSupplier,
+  listSuppliers,
+  updateSupplier,
+} from "@/features/procurement/suppliers/suppliers.api";
+import type {
+  CreateSupplierDto,
+  Supplier as ApiSupplier,
+  UpdateSupplierDto,
+} from "@/features/procurement/suppliers/suppliers.types";
+
+// ✅ keep your UI shape (snake_case) so UI code stays the same
+type Supplier = {
+  id: string;
+  name: string;
+  contact_person: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  is_active: boolean;
+  created_at: string;
+};
+
+function mapApiToUi(s: ApiSupplier): Supplier {
+  return {
+    id: s.id,
+    name: s.name,
+    contact_person: s.contactName ?? null,
+    email: s.email ?? null,
+    phone: s.phone ?? null,
+    address: s.address ?? null,
+    is_active: !!s.isActive,
+    created_at: s.createdAt ?? new Date().toISOString(),
+  };
+}
+
+function toCreateDto(formData: {
+  name: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  address: string;
+}): CreateSupplierDto {
+  return {
+    name: formData.name.trim(),
+    contactName: formData.contact_person.trim() ? formData.contact_person.trim() : undefined,
+    email: formData.email.trim() ? formData.email.trim() : undefined,
+    phone: formData.phone.trim() ? formData.phone.trim() : undefined,
+    address: formData.address.trim() ? formData.address.trim() : undefined,
+  };
+}
+
+function toUpdateDto(formData: {
+  name: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  address: string;
+}): UpdateSupplierDto {
+  // backend accepts partial dto
+  const dto: UpdateSupplierDto = {};
+
+  dto.name = formData.name.trim();
+
+  dto.contactName = formData.contact_person.trim()
+    ? formData.contact_person.trim()
+    : "";
+
+  dto.email = formData.email.trim()
+    ? formData.email.trim()
+    : "";
+
+  dto.phone = formData.phone.trim()
+    ? formData.phone.trim()
+    : "";
+
+  dto.address = formData.address.trim()
+    ? formData.address.trim()
+    : "";
+
+  return dto;
+}
 
 const Suppliers = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [suppliers, setSuppliers] = useState<Supplier[]>(mockSuppliers);
+
+  // ✅ backend suppliers
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
-  const [deleteSupplier, setDeleteSupplier] = useState<Supplier | null>(null);
+  const [deleteSupplierState, setDeleteSupplier] = useState<Supplier | null>(null);
+
   const [formData, setFormData] = useState({
     name: "",
     contact_person: "",
@@ -41,6 +129,24 @@ const Suppliers = () => {
     setIsDialogOpen(false);
   };
 
+  const reloadSuppliers = async () => {
+    try {
+      setLoading(true);
+      // includeDisabled=true so you can see inactive suppliers too
+      const data = await listSuppliers({ includeDisabled: true });
+      setSuppliers((data ?? []).map(mapApiToUi));
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to load suppliers");
+      setSuppliers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void reloadSuppliers();
+  }, []);
+
   const handleEdit = (supplier: Supplier) => {
     setEditingSupplier(supplier);
     setFormData({
@@ -54,50 +160,81 @@ const Suppliers = () => {
     setIsDialogOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingSupplier) {
-      setSuppliers(suppliers.map(s => 
-        s.id === editingSupplier.id 
-          ? { ...s, ...formData }
-          : s
-      ));
-      toast.success("Supplier updated successfully");
-    } else {
-      const newSupplier: Supplier = {
-        id: String(suppliers.length + 1),
-        ...formData,
-        created_at: new Date().toISOString(),
-      };
-      setSuppliers([...suppliers, newSupplier]);
-      toast.success("Supplier created successfully");
+
+    try {
+      if (editingSupplier) {
+        // update basic fields
+        await updateSupplier(editingSupplier.id, toUpdateDto(formData));
+
+        // if user turned OFF active, disable
+        if (editingSupplier.is_active && !formData.is_active) {
+          await disableSupplier(editingSupplier.id);
+        }
+
+        // if user tries to turn ON active (backend doesn’t support enabling yet)
+        if (!editingSupplier.is_active && formData.is_active) {
+          toast.error("Activating a supplier is not supported yet (backend only supports disable).");
+        }
+
+        toast.success("Supplier updated successfully");
+      } else {
+        const created = await createSupplier(toCreateDto(formData));
+
+        // if user created as inactive, disable immediately (backend creates as active)
+        if (!formData.is_active) {
+          await disableSupplier(created.id);
+        }
+
+        toast.success("Supplier created successfully");
+      }
+
+      await reloadSuppliers();
+      resetForm();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to save supplier");
     }
-    resetForm();
   };
 
-  const handleToggleActive = (supplier: Supplier) => {
-    setSuppliers(suppliers.map(s =>
-      s.id === supplier.id
-        ? { ...s, is_active: !s.is_active }
-        : s
-    ));
-    toast.success(`Supplier ${supplier.is_active ? 'deactivated' : 'activated'}`);
+  const handleToggleActive = async (supplier: Supplier) => {
+    try {
+      // backend only has disable, no enable
+      if (!supplier.is_active) {
+        toast.error("Activating a supplier is not supported yet (backend only supports disable).");
+        return;
+      }
+
+      await disableSupplier(supplier.id);
+      toast.success("Supplier deactivated");
+      await reloadSuppliers();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to update supplier status");
+    }
   };
 
-  const handleDelete = () => {
-    if (deleteSupplier) {
-      setSuppliers(suppliers.filter(s => s.id !== deleteSupplier.id));
+  const handleDelete = async () => {
+    if (!deleteSupplierState) return;
+
+    try {
+      // treat delete as disable
+      await disableSupplier(deleteSupplierState.id);
       toast.success("Supplier deleted successfully");
       setDeleteSupplier(null);
+      await reloadSuppliers();
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to delete supplier");
     }
   };
 
-  const filteredSuppliers = suppliers.filter(
-    (supplier) =>
-      supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      supplier.contact_person?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      supplier.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredSuppliers = useMemo(() => {
+    return suppliers.filter(
+      (supplier) =>
+        supplier.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        supplier.contact_person?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        supplier.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [suppliers, searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -106,13 +243,21 @@ const Suppliers = () => {
           <h1 className="text-3xl font-bold tracking-tight">Suppliers</h1>
           <p className="text-muted-foreground">Manage your supplier contacts and information</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) resetForm(); else setIsDialogOpen(true); }}>
+
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) resetForm();
+            else setIsDialogOpen(true);
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Add Supplier
             </Button>
           </DialogTrigger>
+
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>{editingSupplier ? "Edit Supplier" : "Add New Supplier"}</DialogTitle>
@@ -120,6 +265,7 @@ const Suppliers = () => {
                 {editingSupplier ? "Update supplier information" : "Enter the supplier details below"}
               </DialogDescription>
             </DialogHeader>
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Company Name *</Label>
@@ -130,6 +276,7 @@ const Suppliers = () => {
                   required
                 />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="contact_person">Contact Person</Label>
                 <Input
@@ -138,6 +285,7 @@ const Suppliers = () => {
                   onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -148,6 +296,7 @@ const Suppliers = () => {
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone</Label>
                   <Input
@@ -157,6 +306,7 @@ const Suppliers = () => {
                   />
                 </div>
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
                 <Textarea
@@ -166,6 +316,7 @@ const Suppliers = () => {
                   rows={2}
                 />
               </div>
+
               <div className="flex items-center space-x-2">
                 <Switch
                   id="is_active"
@@ -174,6 +325,7 @@ const Suppliers = () => {
                 />
                 <Label htmlFor="is_active">Active Supplier</Label>
               </div>
+
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={resetForm}>
                   Cancel
@@ -202,8 +354,11 @@ const Suppliers = () => {
             </div>
           </CardDescription>
         </CardHeader>
+
         <CardContent>
-          {filteredSuppliers.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+          ) : filteredSuppliers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               {searchQuery ? "No suppliers match your search" : "No suppliers found. Add your first supplier!"}
             </div>
@@ -219,6 +374,7 @@ const Suppliers = () => {
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {filteredSuppliers.map((supplier) => (
                   <TableRow key={supplier.id}>
@@ -228,6 +384,7 @@ const Suppliers = () => {
                         <span className="font-medium">{supplier.name}</span>
                       </div>
                     </TableCell>
+
                     <TableCell>
                       {supplier.contact_person && (
                         <div className="flex items-center gap-2">
@@ -236,6 +393,7 @@ const Suppliers = () => {
                         </div>
                       )}
                     </TableCell>
+
                     <TableCell>
                       {supplier.email && (
                         <div className="flex items-center gap-2">
@@ -244,6 +402,7 @@ const Suppliers = () => {
                         </div>
                       )}
                     </TableCell>
+
                     <TableCell>
                       {supplier.phone && (
                         <div className="flex items-center gap-2">
@@ -252,19 +411,23 @@ const Suppliers = () => {
                         </div>
                       )}
                     </TableCell>
+
                     <TableCell>
                       <Badge variant={supplier.is_active ? "default" : "secondary"}>
                         {supplier.is_active ? "Active" : "Inactive"}
                       </Badge>
                     </TableCell>
+
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(supplier)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
+
                         <Button variant="ghost" size="icon" onClick={() => handleToggleActive(supplier)}>
                           <Switch checked={supplier.is_active} />
                         </Button>
+
                         <Button variant="ghost" size="icon" onClick={() => setDeleteSupplier(supplier)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -278,12 +441,12 @@ const Suppliers = () => {
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!deleteSupplier} onOpenChange={() => setDeleteSupplier(null)}>
+      <AlertDialog open={!!deleteSupplierState} onOpenChange={() => setDeleteSupplier(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deleteSupplier?.name}"? This action cannot be undone.
+              Are you sure you want to delete "{deleteSupplierState?.name}"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
