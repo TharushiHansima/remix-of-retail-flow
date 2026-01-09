@@ -23,6 +23,8 @@ import WarrantyJobs from "./pages/WarrantyJobs";
 import Customers from "./pages/Customers";
 import SalesReports from "./pages/SalesReports";
 import InventoryReports from "./pages/InventoryReports";
+import InventoryValuation from "./pages/InventoryValuation";
+import ProfitMarginReport from "./pages/ProfitMarginReport";
 import RepairReports from "./pages/RepairReports";
 import FinancialSummary from "./pages/FinancialSummary";
 import PurchaseOrders from "./pages/PurchaseOrders";
@@ -100,6 +102,8 @@ const App = () => (
                     <Route path="/customers/history" element={<ServiceHistory />} />
                     <Route path="/reports/sales" element={<SalesReports />} />
                     <Route path="/reports/inventory" element={<InventoryReports />} />
+                    <Route path="/reports/valuation" element={<InventoryValuation />} />
+                    <Route path="/reports/margins" element={<ProfitMarginReport />} />
                     <Route path="/reports/repairs" element={<RepairReports />} />
                     <Route path="/reports/financial" element={<FinancialSummary />} />
                     <Route path="/reports/scheduled" element={<ScheduledReports />} />
