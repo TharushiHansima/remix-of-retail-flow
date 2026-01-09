@@ -1,6 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 
-export type AppRole = "admin" | "manager" | "cashier" | "storekeeper" | "technician" | "accountant";
+export type AppRole =
+  | "admin"
+  | "manager"
+  | "cashier"
+  | "store_keeper"
+  | "technician"
+  | "accountant";
 
 interface Profile {
   id: string;
@@ -10,6 +16,7 @@ interface Profile {
   avatar_url: string | null;
   approval_status: "pending" | "approved" | "rejected";
   role: AppRole;
+  branch_id: string | null; // ✅ NEW
   created_at: string;
 }
 
@@ -43,7 +50,16 @@ interface AuthContextType {
   pendingUsers: PendingUser[];
 
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string, role: AppRole) => Promise<{ error: Error | null }>;
+
+  // ✅ UPDATED: add branchId
+  signUp: (
+    email: string,
+    password: string,
+    fullName: string,
+    role: AppRole,
+    branchId: string
+  ) => Promise<{ error: Error | null }>;
+
   signOut: () => Promise<void>;
 
   hasRole: (role: AppRole) => boolean;
@@ -73,7 +89,9 @@ function extractErrorMessage(data: ApiErrorShape): string {
 }
 
 async function requestJSON<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const url = path.startsWith("http") ? path : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+  const url = path.startsWith("http")
+    ? path
+    : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 
   const res = await fetch(url, {
     ...options,
@@ -108,15 +126,17 @@ function clearAccessToken() {
 }
 
 /**
- * Map frontend role -> backend role safely.
- * If your backend enum doesn't have storekeeper/accountant yet, sending them will fail.
- * Change this mapping after backend enum is updated.
+ * ✅ frontend role -> backend role
+ * (fixed store_keeper mapping to underscore)
  */
-function toBackendRole(role: AppRole): "admin" | "manager" | "cashier" | "technician" {
+function toBackendRole(
+  role: AppRole
+): "admin" | "manager" | "cashier" | "technician" | "store_keeper" | "accountant" {
   if (role === "admin") return "admin";
   if (role === "manager") return "manager";
   if (role === "technician") return "technician";
-  // storekeeper/accountant/cashier -> cashier (safe default)
+  if (role === "store_keeper") return "store_keeper";
+  if (role === "accountant") return "accountant";
   return "cashier";
 }
 
@@ -157,6 +177,7 @@ function buildProfileFromMe(me: MeResponse): { user: User; profile: Profile } {
     avatar_url: null,
     approval_status: active ? "approved" : "pending",
     role,
+    branch_id: me.profile?.branchId ?? null, // ✅ NEW
     created_at: new Date().toISOString(),
   };
 
@@ -182,10 +203,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // session is whatever your app expects; keep it simple
       setSession({ accessToken: token });
 
-      // Try /auth/me if available; fallback if not
       try {
         const me = await requestJSON<MeResponse>("/auth/me", {
           method: "GET",
@@ -197,7 +216,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(mapped.profile);
         setRoles([{ role: mapped.profile.role }]);
       } catch {
-        // If token is invalid OR /auth/me not implemented yet, logout silently
         clearAccessToken();
         setUser(null);
         setProfile(null);
@@ -224,7 +242,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccessToken(res.accessToken);
       setSession({ accessToken: res.accessToken });
 
-      // optional: load profile from /auth/me
       try {
         const me = await requestJSON<MeResponse>("/auth/me", {
           method: "GET",
@@ -236,7 +253,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(mapped.profile);
         setRoles([{ role: mapped.profile.role }]);
       } catch {
-        // fallback if /auth/me missing
         setUser({ id: res.user?.userId || "unknown", email: email.toLowerCase() });
         setProfile({
           id: res.user?.profileId || "unknown",
@@ -246,6 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           avatar_url: null,
           approval_status: "approved",
           role: (res.user?.role as AppRole) || "cashier",
+          branch_id: res.user?.branchId ?? null,
           created_at: new Date().toISOString(),
         });
         setRoles([{ role: ((res.user?.role as AppRole) || "cashier") }]);
@@ -257,8 +274,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ✅ SIGN UP (REGISTER) CONNECTED HERE
-  const signUp = async (email: string, password: string, fullName: string, role: AppRole) => {
+  // ✅ SIGN UP (REGISTER) WITH BRANCH
+  const signUp = async (
+    email: string,
+    password: string,
+    fullName: string,
+    role: AppRole,
+    branchId: string
+  ) => {
     try {
       const res = await requestJSON<AuthTokensResponse>("/auth/register", {
         method: "POST",
@@ -266,15 +289,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: email.toLowerCase(),
           password,
           name: fullName,
-          role: toBackendRole(role), // safe mapping until backend roles updated
-          // adminSecret: "change-me", // add only if you want admin creation protection
+          role: toBackendRole(role),
+          branchId, // ✅ NEW
         }),
       });
 
       setAccessToken(res.accessToken);
       setSession({ accessToken: res.accessToken });
 
-      // optional: load profile from /auth/me
       try {
         const me = await requestJSON<MeResponse>("/auth/me", {
           method: "GET",
@@ -286,8 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(mapped.profile);
         setRoles([{ role: mapped.profile.role }]);
       } catch {
-        // fallback if /auth/me missing
-        const safeRole = role; // keep UI role the user selected
+        const safeRole = role;
         const userId = res.user?.userId || `user-${Date.now()}`;
         const profileId = res.user?.profileId || userId;
 
@@ -300,6 +321,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           avatar_url: null,
           approval_status: "approved",
           role: safeRole,
+          branch_id: branchId, // ✅ NEW
           created_at: new Date().toISOString(),
         });
         setRoles([{ role: safeRole }]);
@@ -321,7 +343,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasRole = (role: AppRole) => roles.some((r) => r.role === role);
 
-  // approval flow not implemented yet (keep functions so UI won't break)
   const approveUser = () => {};
   const rejectUser = () => {};
 
@@ -345,7 +366,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       approveUser,
       rejectUser,
     }),
-    [user, session, profile, roles, isLoading, isApproved, isPendingApproval, pendingUsers],
+    [user, session, profile, roles, isLoading, isApproved, isPendingApproval, pendingUsers]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

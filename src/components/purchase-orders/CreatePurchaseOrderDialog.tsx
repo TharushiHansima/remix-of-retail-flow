@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -45,6 +45,13 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
+// ✅ backend helpers
+import { listProducts } from "@/features/inventory/products/products.api";
+import type { Product as ApiProduct } from "@/features/inventory/products/products.types";
+import { createPurchaseOrder } from "@/features/procurement/purchase-orders/purchase-orders.api";
+import { listSuppliers } from "@/features/procurement/suppliers/suppliers.api";
+import type { Supplier } from "@/features/procurement/suppliers/suppliers.types";
+
 const formSchema = z.object({
   supplierId: z.string().min(1, "Supplier is required"),
   expectedDelivery: z.date({ required_error: "Expected delivery date is required" }),
@@ -54,28 +61,28 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 interface LineItem {
-  id: string;
+  productId: string;
   productName: string;
   quantity: number;
   unitCost: number;
 }
 
-// Mock data - in real app this would come from database
-const mockSuppliers = [
-  { id: "1", name: "Apple Inc." },
-  { id: "2", name: "Samsung Electronics" },
-  { id: "3", name: "Generic Accessories Ltd" },
-  { id: "4", name: "Tech Distributors Inc" },
-  { id: "5", name: "Mobile Accessories Co" },
-];
+function toNumber(v: unknown): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
 
-const mockProducts = [
-  { id: "1", name: "iPhone 15 Pro", sku: "IP15P-256", unitCost: 999 },
-  { id: "2", name: "Samsung Galaxy S24", sku: "SGS24-128", unitCost: 799 },
-  { id: "3", name: "USB-C Cable", sku: "ACC-USBC", unitCost: 15 },
-  { id: "4", name: "Phone Case", sku: "ACC-CASE", unitCost: 25 },
-  { id: "5", name: "Screen Protector", sku: "ACC-SCRN", unitCost: 10 },
-];
+function normalizeProducts(res: any): ApiProduct[] {
+  if (Array.isArray(res)) return res;
+  if (res?.data && Array.isArray(res.data)) return res.data;
+  if (res?.items && Array.isArray(res.items)) return res.items;
+  return [];
+}
 
 interface CreatePurchaseOrderDialogProps {
   open: boolean;
@@ -87,8 +94,14 @@ export function CreatePurchaseOrderDialog({
   onOpenChange,
 }: CreatePurchaseOrderDialogProps) {
   const { toast } = useToast();
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
+  const [productsLoading, setProductsLoading] = useState(false);
+
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState("");
+  const [selectedProductId, setSelectedProductId] = useState("");
   const [quantity, setQuantity] = useState(1);
 
   const form = useForm<FormValues>({
@@ -99,46 +112,97 @@ export function CreatePurchaseOrderDialog({
     },
   });
 
-  const addLineItem = () => {
-    if (!selectedProduct) return;
+  // ✅ Load suppliers + products when dialog opens
+  useEffect(() => {
+    let alive = true;
+    if (!open) return;
 
-    const product = mockProducts.find((p) => p.id === selectedProduct);
+    void (async () => {
+      try {
+        setSuppliersLoading(true);
+        const s = await listSuppliers();
+        if (!alive) return;
+        setSuppliers(Array.isArray(s) ? s.filter(x => x.isActive !== false) : []);
+      } catch (e: any) {
+        if (!alive) return;
+        setSuppliers([]);
+        toast({
+          title: "Error",
+          description: e?.message || "Failed to load suppliers",
+          variant: "destructive",
+        });
+      } finally {
+        if (alive) setSuppliersLoading(false);
+      }
+    })();
+
+    void (async () => {
+      try {
+        setProductsLoading(true);
+        const res = await listProducts({ page: 1, pageSize: 500, isActive: true });
+        const items = normalizeProducts(res);
+        if (!alive) return;
+        setProducts(items.filter(p => p.isActive !== false));
+      } catch (e: any) {
+        if (!alive) return;
+        setProducts([]);
+        toast({
+          title: "Error",
+          description: e?.message || "Failed to load products",
+          variant: "destructive",
+        });
+      } finally {
+        if (alive) setProductsLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [open, toast]);
+
+  const addLineItem = () => {
+    if (!selectedProductId) return;
+
+    const product = products.find((p) => p.id === selectedProductId);
     if (!product) return;
 
-    const existingItem = lineItems.find((item) => item.id === selectedProduct);
-    if (existingItem) {
+    const unitCost = toNumber(product.costPrice ?? 0);
+
+    const existing = lineItems.find((x) => x.productId === selectedProductId);
+    if (existing) {
       setLineItems(
-        lineItems.map((item) =>
-          item.id === selectedProduct
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
+        lineItems.map((x) =>
+          x.productId === selectedProductId
+            ? { ...x, quantity: x.quantity + quantity }
+            : x
         )
       );
     } else {
       setLineItems([
         ...lineItems,
         {
-          id: selectedProduct,
+          productId: selectedProductId,
           productName: product.name,
           quantity,
-          unitCost: product.unitCost,
+          unitCost,
         },
       ]);
     }
 
-    setSelectedProduct("");
+    setSelectedProductId("");
     setQuantity(1);
   };
 
-  const removeLineItem = (id: string) => {
-    setLineItems(lineItems.filter((item) => item.id !== id));
+  const removeLineItem = (productId: string) => {
+    setLineItems(lineItems.filter((x) => x.productId !== productId));
   };
 
-  const updateQuantity = (id: string, newQuantity: number) => {
+  const updateQuantity = (productId: string, newQuantity: number) => {
     if (newQuantity < 1) return;
     setLineItems(
-      lineItems.map((item) =>
-        item.id === id ? { ...item, quantity: newQuantity } : item
+      lineItems.map((x) =>
+        x.productId === productId ? { ...x, quantity: newQuantity } : x
       )
     );
   };
@@ -148,7 +212,18 @@ export function CreatePurchaseOrderDialog({
     0
   );
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
+    const branchId = localStorage.getItem("erp.branchId") || "";
+
+    if (!branchId) {
+      toast({
+        title: "Branch not selected",
+        description: "Please select a branch from the top header and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (lineItems.length === 0) {
       toast({
         title: "Error",
@@ -158,26 +233,38 @@ export function CreatePurchaseOrderDialog({
       return;
     }
 
-    const supplier = mockSuppliers.find((s) => s.id === values.supplierId);
-    
-    // In a real app, this would save to the database
-    console.log("Creating PO:", {
-      supplier: supplier?.name,
-      expectedDelivery: values.expectedDelivery,
-      notes: values.notes,
-      items: lineItems,
-      totalValue,
-    });
+    try {
+      await createPurchaseOrder({
+        supplierId: values.supplierId,
+        branchId,
+        expectedDate: values.expectedDelivery.toISOString(),
+        notes: values.notes,
+        items: lineItems.map((x) => ({
+          productId: x.productId,
+          quantity: x.quantity,
+          unitCost: x.unitCost,
+          taxRate: 0,
+        })),
+      });
 
-    toast({
-      title: "Purchase Order Created",
-      description: `PO created for ${supplier?.name} with ${lineItems.length} items`,
-    });
+      const supplier = suppliers.find((s) => s.id === values.supplierId);
 
-    // Reset form
-    form.reset();
-    setLineItems([]);
-    onOpenChange(false);
+      toast({
+        title: "Purchase Order Created",
+        description: `PO created for ${supplier?.name ?? "Supplier"} with ${lineItems.length} items`,
+      });
+
+      form.reset();
+      setLineItems([]);
+      window.dispatchEvent(new Event("purchase-orders:changed"));
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({
+        title: "Error",
+        description: e?.message || "Failed to create purchase order",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleClose = () => {
@@ -206,15 +293,27 @@ export function CreatePurchaseOrderDialog({
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select supplier" />
+                          <SelectValue
+                            placeholder={suppliersLoading ? "Loading suppliers..." : "Select supplier"}
+                          />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockSuppliers.map((supplier) => (
-                          <SelectItem key={supplier.id} value={supplier.id}>
-                            {supplier.name}
+                        {suppliersLoading ? (
+                          <SelectItem value="__loading" disabled>
+                            Loading...
                           </SelectItem>
-                        ))}
+                        ) : suppliers.length === 0 ? (
+                          <SelectItem value="__empty" disabled>
+                            No suppliers found
+                          </SelectItem>
+                        ) : (
+                          suppliers.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -238,11 +337,7 @@ export function CreatePurchaseOrderDialog({
                               !field.value && "text-muted-foreground"
                             )}
                           >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
@@ -267,18 +362,32 @@ export function CreatePurchaseOrderDialog({
             <div className="space-y-3">
               <h3 className="text-sm font-medium">Order Items</h3>
               <div className="flex gap-2">
-                <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                <Select value={selectedProductId} onValueChange={setSelectedProductId}>
                   <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select product" />
+                    <SelectValue
+                      placeholder={productsLoading ? "Loading products..." : "Select product"}
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockProducts.map((product) => (
-                      <SelectItem key={product.id} value={product.id}>
-                        {product.name} - ${product.unitCost}
+                    {productsLoading ? (
+                      <SelectItem value="__loading" disabled>
+                        Loading...
                       </SelectItem>
-                    ))}
+                    ) : products.length === 0 ? (
+                      <SelectItem value="__empty" disabled>
+                        No products found
+                      </SelectItem>
+                    ) : (
+                      products.map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}
+                          {p.sku ? ` (${p.sku})` : ""} - ${toNumber(p.costPrice).toLocaleString()}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+
                 <Input
                   type="number"
                   min={1}
@@ -309,7 +418,7 @@ export function CreatePurchaseOrderDialog({
                   </TableHeader>
                   <TableBody>
                     {lineItems.map((item) => (
-                      <TableRow key={item.id}>
+                      <TableRow key={item.productId}>
                         <TableCell>{item.productName}</TableCell>
                         <TableCell>
                           <Input
@@ -317,7 +426,7 @@ export function CreatePurchaseOrderDialog({
                             min={1}
                             value={item.quantity}
                             onChange={(e) =>
-                              updateQuantity(item.id, parseInt(e.target.value) || 1)
+                              updateQuantity(item.productId, parseInt(e.target.value) || 1)
                             }
                             className="w-20 text-center mx-auto"
                           />
@@ -334,7 +443,7 @@ export function CreatePurchaseOrderDialog({
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive"
-                            onClick={() => removeLineItem(item.id)}
+                            onClick={() => removeLineItem(item.productId)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

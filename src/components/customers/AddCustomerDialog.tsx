@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { UserPlus } from "lucide-react";
+
 import {
   Dialog,
   DialogContent,
@@ -20,13 +21,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+
+import { customersApi } from "@/features/customers/customers.api"; // <-- adjust path if yours is different
 
 const formSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
-  phone: z.string().optional(),
-  address: z.string().optional(),
+  phone: z.string().optional().or(z.literal("")),
+  address: z.string().optional().or(z.literal("")),
+  type: z.enum(["individual", "business"]).default("individual"),
   creditLimit: z.coerce.number().min(0).default(0),
 });
 
@@ -52,23 +55,21 @@ export function AddCustomerDialog({
       email: "",
       phone: "",
       address: "",
+      type: "individual",
       creditLimit: 0,
     },
   });
 
   const onSubmit = async (values: FormValues) => {
     try {
-      const { error } = await supabase.from("customers").insert({
+      await customersApi.create({
         name: values.name,
         email: values.email || null,
         phone: values.phone || null,
         address: values.address || null,
-        credit_limit: values.creditLimit,
-        credit_balance: 0,
-        is_active: true,
+        type: values.type,
+        creditLimit: values.creditLimit ?? 0,
       });
-
-      if (error) throw error;
 
       toast({
         title: "Customer Added",
@@ -78,11 +79,11 @@ export function AddCustomerDialog({
       form.reset();
       onOpenChange(false);
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding customer:", error);
       toast({
         title: "Error",
-        description: "Failed to add customer. Please try again.",
+        description: error?.message || "Failed to add customer. Please try again.",
         variant: "destructive",
       });
     }
@@ -94,8 +95,9 @@ export function AddCustomerDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* ✅ only added max-h + overflow for scroll, UI stays same */}
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/10">
@@ -150,6 +152,28 @@ export function AddCustomerDialog({
                 )}
               />
             </div>
+
+            {/* keeping your UI idea: Type dropdown */}
+            <FormField
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Type</FormLabel>
+                  <FormControl>
+                    <select
+                      className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                      value={field.value}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    >
+                      <option value="individual">Individual</option>
+                      <option value="business">Business</option>
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}

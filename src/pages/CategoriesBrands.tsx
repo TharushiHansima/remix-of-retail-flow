@@ -1,6 +1,6 @@
 // CategoriesBrands.tsx
 import { useEffect, useState } from 'react';
-import { Plus, Edit, Trash2, Tag, Award } from 'lucide-react';
+import { Plus, Edit, Trash2, Tag, Award, Power, ToggleLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { Skeleton } from '@/components/ui/skeleton';
 
 /* =========================
    API (added only)
@@ -54,15 +55,18 @@ type ApiBrand = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  productCount?: number;
 };
 
 type ApiCategory = {
   id: string;
   name: string;
   parentId: string | null;
+  brandId?: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  productCount?: number;
 };
 
 function getAuthHeader() {
@@ -109,9 +113,8 @@ async function apiRequest<T>(
 }
 
 // brands
-async function listBrandsApi() {
-  // controller supports includeDisabled but not needed for UI
-  return apiRequest<ApiBrand[]>('/inventory/brands', { method: 'GET' });
+async function listBrandsApi(includeDisabled = true) {
+  return apiRequest<ApiBrand[]>(`/inventory/brands?includeDisabled=${includeDisabled}`, { method: 'GET' });
 }
 async function createBrandApi(name: string) {
   return apiRequest<ApiBrand>('/inventory/brands', { method: 'POST', json: { name } });
@@ -122,31 +125,39 @@ async function updateBrandApi(id: string, name: string) {
 async function disableBrandApi(id: string) {
   return apiRequest<ApiBrand>(`/inventory/brands/${id}/disable`, { method: 'PATCH' });
 }
+async function enableBrandApi(id: string) {
+  return apiRequest<ApiBrand>(`/inventory/brands/${id}/enable`, { method: 'PATCH' });
+}
 
 // categories
-async function listCategoriesApi() {
-  return apiRequest<ApiCategory[]>('/inventory/categories', { method: 'GET' });
+async function listCategoriesApi(includeDisabled = true) {
+  return apiRequest<ApiCategory[]>(`/inventory/categories?includeDisabled=${includeDisabled}`, { method: 'GET' });
 }
-async function createCategoryApi(input: { name: string; parentId?: string }) {
+async function createCategoryApi(input: { name: string; brandId?: string }) {
   return apiRequest<ApiCategory>('/inventory/categories', { method: 'POST', json: input });
 }
-async function updateCategoryApi(id: string, input: { name?: string; parentId?: string | null }) {
+async function updateCategoryApi(id: string, input: { name?: string; brandId?: string | null }) {
   return apiRequest<ApiCategory>(`/inventory/categories/${id}`, { method: 'PATCH', json: input });
 }
 async function disableCategoryApi(id: string) {
   return apiRequest<ApiCategory>(`/inventory/categories/${id}/disable`, { method: 'PATCH' });
 }
+async function enableCategoryApi(id: string) {
+  return apiRequest<ApiCategory>(`/inventory/categories/${id}/enable`, { method: 'PATCH' });
+}
 
 /* =========================
    UI types (same shape as before)
    ========================= */
-type Category = { id: string; name: string; parentId: string | null; productCount: number };
-type Brand = { id: string; name: string; productCount: number };
+type Category = { id: string; name: string; brandId: string | null; isActive: boolean; productCount: number };
+type Brand = { id: string; name: string; isActive: boolean; productCount: number };
+
+type StatusFilterType = 'all' | 'active' | 'disabled';
 
 export default function CategoriesBrands() {
-  // ✅ removed dummy data
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -154,23 +165,29 @@ export default function CategoriesBrands() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [newCategoryParent, setNewCategoryParent] = useState<string>('none');
+  const [newCategoryBrand, setNewCategoryBrand] = useState<string>('none');
   const [newBrandName, setNewBrandName] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState<{ type: 'category' | 'brand'; id: string; name: string } | null>(null);
 
-  // ✅ load categories + brands from backend
+  // Status filter
+  const [categoryStatusFilter, setCategoryStatusFilter] = useState<StatusFilterType>('all');
+  const [brandStatusFilter, setBrandStatusFilter] = useState<StatusFilterType>('all');
+
+  // load categories + brands from backend
   useEffect(() => {
     const loadAll = async () => {
+      setLoading(true);
       try {
-        const [cats, brs] = await Promise.all([listCategoriesApi(), listBrandsApi()]);
+        const [cats, brs] = await Promise.all([listCategoriesApi(true), listBrandsApi(true)]);
 
         setCategories(
           cats.map((c) => ({
             id: c.id,
             name: c.name,
-            parentId: c.parentId ?? null,
-            productCount: 0, // backend not sending productCount
+            brandId: c.brandId ?? c.parentId ?? null,
+            isActive: c.isActive ?? true,
+            productCount: c.productCount ?? 0,
           })),
         );
 
@@ -178,42 +195,37 @@ export default function CategoriesBrands() {
           brs.map((b) => ({
             id: b.id,
             name: b.name,
-            productCount: 0, // backend not sending productCount
+            isActive: b.isActive ?? true,
+            productCount: b.productCount ?? 0,
           })),
         );
       } catch (e: any) {
         toast.error(e?.message || 'Failed to load categories/brands');
+      } finally {
+        setLoading(false);
       }
     };
 
     void loadAll();
   }, []);
 
-  const parentCategories = categories.filter(c => !c.parentId);
-
-  const getCategoryHierarchy = (category: Category) => {
-    if (!category.parentId) return category.name;
-    const parent = categories.find(c => c.id === category.parentId);
-    return parent ? `${parent.name} → ${category.name}` : category.name;
-  };
+  const activeBrands = brands.filter(b => b.isActive);
 
   const openDeleteDialog = (type: 'category' | 'brand', id: string, name: string) => {
     setDeletingItem({ type, id, name });
     setDeleteDialogOpen(true);
   };
 
-  // ✅ Brand: "delete" -> DISABLE
-  // ✅ Category: controller also provides DISABLE (no delete), so we disable + remove from UI
   const handleConfirmDelete = async () => {
     if (!deletingItem) return;
 
     if (deletingItem.type === 'category') {
       try {
         await disableCategoryApi(deletingItem.id);
-
-        // keep same UI behavior as before (remove category + direct subcategories from UI)
-        setCategories(categories.filter(c => c.id !== deletingItem.id && c.parentId !== deletingItem.id));
-        toast.success('Category deleted successfully');
+        setCategories(categories.map(c => 
+          c.id === deletingItem.id ? { ...c, isActive: false } : c
+        ));
+        toast.success('Category disabled successfully');
       } catch (e: any) {
         toast.error(e?.message || 'Failed to disable category');
       } finally {
@@ -225,10 +237,10 @@ export default function CategoriesBrands() {
 
     try {
       await disableBrandApi(deletingItem.id);
-
-      // keep same UI behavior as before (remove brand from UI)
-      setBrands(brands.filter(b => b.id !== deletingItem.id));
-      toast.success('Brand deleted successfully');
+      setBrands(brands.map(b => 
+        b.id === deletingItem.id ? { ...b, isActive: false } : b
+      ));
+      toast.success('Brand disabled successfully');
     } catch (e: any) {
       toast.error(e?.message || 'Failed to disable brand');
     } finally {
@@ -237,27 +249,67 @@ export default function CategoriesBrands() {
     }
   };
 
-  // ✅ Category create -> POST /inventory/categories
+  const handleToggleCategoryStatus = async (category: Category) => {
+    try {
+      if (category.isActive) {
+        await disableCategoryApi(category.id);
+        setCategories(categories.map(c => 
+          c.id === category.id ? { ...c, isActive: false } : c
+        ));
+        toast.success('Category disabled');
+      } else {
+        await enableCategoryApi(category.id);
+        setCategories(categories.map(c => 
+          c.id === category.id ? { ...c, isActive: true } : c
+        ));
+        toast.success('Category enabled');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update category status');
+    }
+  };
+
+  const handleToggleBrandStatus = async (brand: Brand) => {
+    try {
+      if (brand.isActive) {
+        await disableBrandApi(brand.id);
+        setBrands(brands.map(b => 
+          b.id === brand.id ? { ...b, isActive: false } : b
+        ));
+        toast.success('Brand disabled');
+      } else {
+        await enableBrandApi(brand.id);
+        setBrands(brands.map(b => 
+          b.id === brand.id ? { ...b, isActive: true } : b
+        ));
+        toast.success('Brand enabled');
+      }
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to update brand status');
+    }
+  };
+
   const handleAddCategory = async () => {
     if (!newCategoryName.trim()) return;
 
     try {
       const created = await createCategoryApi({
         name: newCategoryName.trim(),
-        ...(newCategoryParent === 'none' ? {} : { parentId: newCategoryParent }),
+        ...(newCategoryBrand === 'none' ? {} : { brandId: newCategoryBrand }),
       });
 
       const newCategory: Category = {
         id: created.id,
         name: created.name,
-        parentId: created.parentId ?? null,
+        brandId: created.brandId ?? null,
+        isActive: created.isActive ?? true,
         productCount: 0,
       };
 
       setCategories([newCategory, ...categories]);
 
       setNewCategoryName('');
-      setNewCategoryParent('none');
+      setNewCategoryBrand('none');
       setCategoryDialogOpen(false);
       toast.success('Category added successfully');
     } catch (e: any) {
@@ -265,27 +317,26 @@ export default function CategoriesBrands() {
     }
   };
 
-  // ✅ Category update -> PATCH /inventory/categories/:id
   const handleEditCategory = async () => {
     if (!editingCategory || !newCategoryName.trim()) return;
 
     try {
       const updated = await updateCategoryApi(editingCategory.id, {
         name: newCategoryName.trim(),
-        parentId: newCategoryParent === 'none' ? null : newCategoryParent,
+        brandId: newCategoryBrand === 'none' ? null : newCategoryBrand,
       });
 
       setCategories(
         categories.map((c) =>
           c.id === editingCategory.id
-            ? { ...c, name: updated.name, parentId: updated.parentId ?? null }
+            ? { ...c, name: updated.name, brandId: updated.brandId ?? null }
             : c,
         ),
       );
 
       setEditingCategory(null);
       setNewCategoryName('');
-      setNewCategoryParent('none');
+      setNewCategoryBrand('none');
       setCategoryDialogOpen(false);
       toast.success('Category updated successfully');
     } catch (e: any) {
@@ -293,7 +344,6 @@ export default function CategoriesBrands() {
     }
   };
 
-  // ✅ Brand create -> POST /inventory/brands
   const handleAddBrand = async () => {
     if (!newBrandName.trim()) return;
 
@@ -303,6 +353,7 @@ export default function CategoriesBrands() {
       const newBrand: Brand = {
         id: created.id,
         name: created.name,
+        isActive: created.isActive ?? true,
         productCount: 0,
       };
 
@@ -315,7 +366,6 @@ export default function CategoriesBrands() {
     }
   };
 
-  // ✅ Brand update -> PATCH /inventory/brands/:id
   const handleEditBrand = async () => {
     if (!editingBrand || !newBrandName.trim()) return;
 
@@ -338,7 +388,7 @@ export default function CategoriesBrands() {
   const openEditCategory = (category: Category) => {
     setEditingCategory(category);
     setNewCategoryName(category.name);
-    setNewCategoryParent(category.parentId || 'none');
+    setNewCategoryBrand(category.brandId || 'none');
     setCategoryDialogOpen(true);
   };
 
@@ -348,13 +398,26 @@ export default function CategoriesBrands() {
     setBrandDialogOpen(true);
   };
 
-  const filteredCategories = categories.filter(c =>
-    c.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCategories = categories.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = categoryStatusFilter === 'all' || 
+      (categoryStatusFilter === 'active' && c.isActive) ||
+      (categoryStatusFilter === 'disabled' && !c.isActive);
+    return matchesSearch && matchesStatus;
+  });
 
-  const filteredBrands = brands.filter(b =>
-    b.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBrands = brands.filter(b => {
+    const matchesSearch = b.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = brandStatusFilter === 'all' || 
+      (brandStatusFilter === 'active' && b.isActive) ||
+      (brandStatusFilter === 'disabled' && !b.isActive);
+    return matchesSearch && matchesStatus;
+  });
+
+  const getBrandName = (brandId: string | null) => {
+    if (!brandId) return null;
+    return brands.find(b => b.id === brandId)?.name || null;
+  };
 
   return (
     <div className="space-y-6">
@@ -414,56 +477,97 @@ export default function CategoriesBrands() {
             </TabsList>
 
             <TabsContent value="categories" className="space-y-4">
-              <div className="flex justify-end">
+              <div className="flex justify-between items-center">
+                <Tabs value={categoryStatusFilter} onValueChange={(v) => setCategoryStatusFilter(v as StatusFilterType)}>
+                  <TabsList className="bg-transparent border">
+                    <TabsTrigger value="all">All</TabsTrigger>
+                    <TabsTrigger value="active">Active</TabsTrigger>
+                    <TabsTrigger value="disabled">Disabled</TabsTrigger>
+                  </TabsList>
+                </Tabs>
                 <Button onClick={() => {
                   setEditingCategory(null);
                   setNewCategoryName('');
-                  setNewCategoryParent('none');
+                  setNewCategoryBrand('none');
                   setCategoryDialogOpen(true);
                 }}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Category
                 </Button>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Parent</TableHead>
-                    <TableHead>Products</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredCategories.map((category) => (
-                    <TableRow key={category.id}>
-                      <TableCell className="font-medium">{category.name}</TableCell>
-                      <TableCell>
-                        {category.parentId ? (
-                          <Badge variant="secondary">
-                            {categories.find(c => c.id === category.parentId)?.name}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">Root</span>
-                        )}
-                      </TableCell>
-                      <TableCell>{category.productCount}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => openEditCategory(category)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openDeleteDialog('category', category.id, category.name)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+              {loading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-12 w-full" />
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+              ) : filteredCategories.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No categories found
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Brand</TableHead>
+                      <TableHead>Products</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCategories.map((category) => (
+                      <TableRow key={category.id} className={!category.isActive ? 'opacity-50' : ''}>
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell>
+                          {category.brandId ? (
+                            <Badge variant="secondary">
+                              {getBrandName(category.brandId)}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{category.productCount}</TableCell>
+                        <TableCell>
+                          <Badge variant={category.isActive ? 'default' : 'secondary'}>
+                            {category.isActive ? 'Active' : 'Disabled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => openEditCategory(category)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleToggleCategoryStatus(category)}
+                            title={category.isActive ? 'Disable' : 'Enable'}
+                          >
+                            {category.isActive ? (
+                              <Power className="h-4 w-4 text-destructive" />
+                            ) : (
+                              <ToggleLeft className="h-4 w-4 text-primary" />
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </TabsContent>
 
             <TabsContent value="brands" className="space-y-4">
-              <div className="flex justify-end">
+              <div className="flex justify-between items-center">
+                <Tabs value={brandStatusFilter} onValueChange={(v) => setBrandStatusFilter(v as StatusFilterType)}>
+                  <TabsList className="bg-transparent border">
+                    <TabsTrigger value="all">All</TabsTrigger>
+                    <TabsTrigger value="active">Active</TabsTrigger>
+                    <TabsTrigger value="disabled">Disabled</TabsTrigger>
+                  </TabsList>
+                </Tabs>
                 <Button onClick={() => {
                   setEditingBrand(null);
                   setNewBrandName('');
@@ -473,31 +577,58 @@ export default function CategoriesBrands() {
                   Add Brand
                 </Button>
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Products</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredBrands.map((brand) => (
-                    <TableRow key={brand.id}>
-                      <TableCell className="font-medium">{brand.name}</TableCell>
-                      <TableCell>{brand.productCount}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => openEditBrand(brand)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openDeleteDialog('brand', brand.id, brand.name)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+              {loading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-12 w-full" />
                   ))}
-                </TableBody>
-              </Table>
+                </div>
+              ) : filteredBrands.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No brands found
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Products</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredBrands.map((brand) => (
+                      <TableRow key={brand.id} className={!brand.isActive ? 'opacity-50' : ''}>
+                        <TableCell className="font-medium">{brand.name}</TableCell>
+                        <TableCell>{brand.productCount}</TableCell>
+                        <TableCell>
+                          <Badge variant={brand.isActive ? 'default' : 'secondary'}>
+                            {brand.isActive ? 'Active' : 'Disabled'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => openEditBrand(brand)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleToggleBrandStatus(brand)}
+                            title={brand.isActive ? 'Disable' : 'Enable'}
+                          >
+                            {brand.isActive ? (
+                              <Power className="h-4 w-4 text-destructive" />
+                            ) : (
+                              <ToggleLeft className="h-4 w-4 text-primary" />
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>
@@ -508,6 +639,9 @@ export default function CategoriesBrands() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingCategory ? 'Edit Category' : 'Add Category'}</DialogTitle>
+            <DialogDescription>
+              {editingCategory ? 'Update category details.' : 'Create a new product category.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -519,15 +653,17 @@ export default function CategoriesBrands() {
               />
             </div>
             <div>
-              <Label>Parent Category</Label>
-              <Select value={newCategoryParent} onValueChange={setNewCategoryParent}>
+              <Label>Brand</Label>
+              <Select value={newCategoryBrand} onValueChange={setNewCategoryBrand}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select parent category" />
+                  <SelectValue placeholder="Select brand" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None (Root Category)</SelectItem>
-                  {parentCategories.filter(c => c.id !== editingCategory?.id).map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
+                  {activeBrands.map((brand) => (
+                    <SelectItem key={brand.id} value={brand.id}>
+                      {brand.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -547,6 +683,9 @@ export default function CategoriesBrands() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editingBrand ? 'Edit Brand' : 'Add Brand'}</DialogTitle>
+            <DialogDescription>
+              {editingBrand ? 'Update brand details.' : 'Create a new brand.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -571,17 +710,16 @@ export default function CategoriesBrands() {
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete {deletingItem?.type === 'category' ? 'Category' : 'Brand'}</AlertDialogTitle>
+            <AlertDialogTitle>Disable {deletingItem?.type === 'category' ? 'Category' : 'Brand'}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{deletingItem?.name}"?
-              {deletingItem?.type === 'category' && ' This will also delete all subcategories.'}
-              This action cannot be undone.
+              Are you sure you want to disable "{deletingItem?.name}"?
+              This will make it inactive but won't delete any associated data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={() => void handleConfirmDelete()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Delete
+              Disable
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

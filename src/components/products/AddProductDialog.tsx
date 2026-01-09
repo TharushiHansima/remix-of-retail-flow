@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +20,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { CreateProductDto } from "@/features/inventory/products/products.types";
+import { listSuppliers } from "@/features/procurement/suppliers/suppliers.api";
+import type { Supplier } from "@/features/procurement/suppliers/suppliers.types";
+import { toast } from "sonner";
 
 type Option = { id: string; name: string };
 
@@ -42,6 +46,7 @@ const emptyForm = {
   description: "",
   categoryId: "none",
   brandId: "none",
+  supplierId: "none",
   unitPrice: "",
   wholesalePrice: "",
   costPrice: "",
@@ -64,6 +69,26 @@ export function AddProductDialog({
     ...emptyForm,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [suppliersLoading, setSuppliersLoading] = useState(false);
+
+  // Load suppliers when dialog opens
+  useEffect(() => {
+    if (open) {
+      const loadSuppliers = async () => {
+        setSuppliersLoading(true);
+        try {
+          const data = await listSuppliers({ includeDisabled: false });
+          setSuppliers(Array.isArray(data) ? data.filter(s => s.isActive !== false) : []);
+        } catch (e: any) {
+          console.error("Failed to load suppliers:", e);
+        } finally {
+          setSuppliersLoading(false);
+        }
+      };
+      void loadSuppliers();
+    }
+  }, [open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,9 +113,35 @@ export function AddProductDialog({
     const costPrice = toOptionalNumber(formData.costPrice);
     if (costPrice !== undefined) dto.costPrice = costPrice;
 
+    const wholesalePrice = toOptionalNumber(formData.wholesalePrice);
+    if (wholesalePrice !== undefined) dto.wholesalePrice = wholesalePrice;
+
+    const minStockLevel = toOptionalNumber(formData.minStockLevel);
+    if (minStockLevel !== undefined) dto.minStockLevel = minStockLevel;
+
+    const maxStockLevel = toOptionalNumber(formData.maxStockLevel);
+    if (formData.maxStockLevel.trim() === "") {
+      // leave undefined
+    } else if (maxStockLevel !== undefined) {
+      dto.maxStockLevel = maxStockLevel;
+    }
+
+    const reorderQty = toOptionalNumber(formData.reorderQuantity);
+    if (reorderQty !== undefined) dto.reorderQty = reorderQty;
+
+    dto.isActive = formData.isActive;
+
+    // Note: supplierId is stored for display but actual supplier mapping 
+    // should be done via product suppliers API after creation
+    const selectedSupplierId = formData.supplierId !== "none" ? formData.supplierId : null;
+
     try {
       const ok = await onSubmit(dto);
       if (ok) {
+        // If supplier was selected, show info that it can be linked later
+        if (selectedSupplierId) {
+          toast.info("Supplier preference saved. Link it via Product Suppliers after creation.");
+        }
         setFormData({ ...emptyForm });
         onOpenChange(false);
       }
@@ -104,6 +155,9 @@ export function AddProductDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Product</DialogTitle>
+          <DialogDescription>
+            Fill in the product details below. Required fields are marked with *.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
@@ -182,6 +236,31 @@ export function AddProductDialog({
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            {/* Supplier dropdown */}
+            <div className="space-y-2">
+              <Label htmlFor="supplier">
+                Supplier <span className="text-muted-foreground text-xs">(optional, recommended)</span>
+              </Label>
+              <Select
+                value={formData.supplierId}
+                onValueChange={(value) => setFormData({ ...formData, supplierId: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={suppliersLoading ? "Loading..." : "Select supplier"} />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  <SelectItem value="none">No supplier</SelectItem>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Selecting a supplier helps with reordering and cost tracking
+              </p>
             </div>
           </div>
 

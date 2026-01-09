@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
@@ -46,7 +46,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { CreateGRNDialog } from "@/components/grn/CreateGRNDialog";
+// CreateGRNDialog removed - GRN creation should come from PO flow
+
+// ✅ API
+import { listGrns, getGrn, setGrnVerification } from "@/features/procurement/grns/grns.api";
+import type { GrnApi } from "@/features/procurement/grns/grns.types";
 
 interface GRNItem {
   id: string;
@@ -84,197 +88,150 @@ interface GRN {
   landedCosts: LandedCost[];
 }
 
-const grns: GRN[] = [
-  {
-    id: "1",
-    grnNumber: "GRN-2024-0001",
-    poNumber: "PO-2024-0012",
-    supplier: "Apple Inc.",
-    branch: "Main Branch",
-    status: "completed",
-    invoiceNumber: "APL-INV-45678",
-    invoiceDate: new Date("2024-01-15"),
-    receivedDate: new Date("2024-01-18"),
-    subtotal: 9500,
-    landedCost: 450,
-    totalAmount: 9950,
-    items: [
-      { id: "1", product: "iPhone 15 Pro Max 256GB", sku: "APL-IP15PM-256", orderedQty: 10, receivedQty: 10, unitCost: 950, variance: 0 },
-    ],
-    landedCosts: [
-      { id: "1", type: "shipping", description: "Air Freight", amount: 350 },
-      { id: "2", type: "handling", description: "Warehouse Handling", amount: 100 },
-    ],
-  },
-  {
-    id: "2",
-    grnNumber: "GRN-2024-0002",
-    poNumber: "PO-2024-0015",
-    supplier: "Samsung Electronics",
-    branch: "Main Branch",
-    status: "verified",
-    invoiceNumber: "SAM-INV-12345",
-    invoiceDate: new Date("2024-01-20"),
-    receivedDate: new Date("2024-01-22"),
-    subtotal: 8500,
-    landedCost: 380,
-    totalAmount: 8880,
-    items: [
-      { id: "1", product: "Samsung Galaxy S24 Ultra", sku: "SAM-S24U-256", orderedQty: 10, receivedQty: 9, unitCost: 850, variance: -1 },
-      { id: "2", product: "Samsung Galaxy Tab S9", sku: "SAM-TAB-S9", orderedQty: 5, receivedQty: 5, unitCost: 650, variance: 0 },
-    ],
-    landedCosts: [
-      { id: "1", type: "shipping", description: "Sea Freight", amount: 280 },
-      { id: "2", type: "customs", description: "Import Duty", amount: 100 },
-    ],
-  },
-  {
-    id: "3",
-    grnNumber: "GRN-2024-0003",
-    poNumber: "PO-2024-0018",
-    supplier: "Generic Tech Supplies",
-    branch: "Warehouse",
-    status: "pending",
-    invoiceNumber: "GTS-2024-789",
-    invoiceDate: new Date("2024-01-25"),
-    receivedDate: new Date("2024-01-27"),
-    subtotal: 2200,
-    landedCost: 0,
-    totalAmount: 2200,
-    items: [
-      { id: "1", product: "USB-C Fast Charger 65W", sku: "ACC-USBC-65W", orderedQty: 100, receivedQty: 100, unitCost: 22, batchNumber: "BATCH-2024-01", expiryDate: new Date("2026-01-27"), variance: 0 },
-    ],
-    landedCosts: [],
-  },
-  {
-    id: "4",
-    grnNumber: "GRN-2024-0004",
-    poNumber: "PO-2024-0020",
-    supplier: "Logitech International",
-    branch: "Main Branch",
-    status: "completed",
-    invoiceNumber: "LOG-2024-5678",
-    invoiceDate: new Date("2024-01-28"),
-    receivedDate: new Date("2024-01-30"),
-    subtotal: 4500,
-    landedCost: 220,
-    totalAmount: 4720,
-    items: [
-      { id: "1", product: "Logitech MX Master 3S", sku: "LOG-MX-M3S", orderedQty: 30, receivedQty: 30, unitCost: 69, variance: 0 },
-      { id: "2", product: "Logitech C920 HD Webcam", sku: "LOG-C920-HD", orderedQty: 25, receivedQty: 25, unitCost: 49, variance: 0 },
-    ],
-    landedCosts: [
-      { id: "1", type: "shipping", description: "Express Delivery", amount: 180 },
-      { id: "2", type: "insurance", description: "Cargo Insurance", amount: 40 },
-    ],
-  },
-  {
-    id: "5",
-    grnNumber: "GRN-2024-0005",
-    poNumber: "PO-2024-0023",
-    supplier: "Anker Innovations",
-    branch: "Downtown Store",
-    status: "verified",
-    invoiceNumber: "ANK-INV-9012",
-    invoiceDate: new Date("2024-02-01"),
-    receivedDate: new Date("2024-02-03"),
-    subtotal: 3500,
-    landedCost: 150,
-    totalAmount: 3650,
-    items: [
-      { id: "1", product: "Anker PowerCore 20000mAh", sku: "ANK-PWR-20K", orderedQty: 50, receivedQty: 48, unitCost: 35, batchNumber: "ANK-B2024-02", variance: -2 },
-      { id: "2", product: "USB Hub 7-Port", sku: "ANK-HUB-7P", orderedQty: 40, receivedQty: 40, unitCost: 29, variance: 0 },
-    ],
-    landedCosts: [
-      { id: "1", type: "shipping", description: "Standard Shipping", amount: 150 },
-    ],
-  },
-  {
-    id: "6",
-    grnNumber: "GRN-2024-0006",
-    poNumber: "PO-2024-0025",
-    supplier: "Sony Corporation",
-    branch: "Warehouse",
-    status: "pending",
-    invoiceNumber: "SONY-2024-3456",
-    invoiceDate: new Date("2024-02-05"),
-    receivedDate: new Date("2024-02-07"),
-    subtotal: 14950,
-    landedCost: 0,
-    totalAmount: 14950,
-    items: [
-      { id: "1", product: "Sony WH-1000XM5 Headphones", sku: "SONY-WH1000", orderedQty: 50, receivedQty: 50, unitCost: 299, variance: 0 },
-    ],
-    landedCosts: [],
-  },
-  {
-    id: "7",
-    grnNumber: "GRN-2024-0007",
-    poNumber: "PO-2024-0028",
-    supplier: "Dell Technologies",
-    branch: "Main Branch",
-    status: "completed",
-    invoiceNumber: "DELL-INV-7890",
-    invoiceDate: new Date("2024-02-08"),
-    receivedDate: new Date("2024-02-10"),
-    subtotal: 25980,
-    landedCost: 580,
-    totalAmount: 26560,
-    items: [
-      { id: "1", product: "Dell XPS 15 i7", sku: "DEL-XPS15-I7", orderedQty: 15, receivedQty: 15, unitCost: 1299, variance: 0 },
-      { id: "2", product: "Dell 27\" 4K Monitor", sku: "DEL-MON-27", orderedQty: 10, receivedQty: 9, unitCost: 349, variance: -1 },
-    ],
-    landedCosts: [
-      { id: "1", type: "shipping", description: "Freight Charges", amount: 450 },
-      { id: "2", type: "handling", description: "Special Handling - Fragile", amount: 130 },
-    ],
-  },
-  {
-    id: "8",
-    grnNumber: "GRN-2024-0008",
-    poNumber: "PO-2024-0030",
-    supplier: "TP-Link Technologies",
-    branch: "Downtown Store",
-    status: "verified",
-    invoiceNumber: "TPL-2024-1234",
-    invoiceDate: new Date("2024-02-10"),
-    receivedDate: new Date("2024-02-12"),
-    subtotal: 4450,
-    landedCost: 120,
-    totalAmount: 4570,
-    items: [
-      { id: "1", product: "TP-Link Archer AX50 WiFi 6", sku: "TPL-WIFI6-AX", orderedQty: 35, receivedQty: 35, unitCost: 89, variance: 0 },
-      { id: "2", product: "TP-Link Mesh System", sku: "TPL-MESH-3", orderedQty: 10, receivedQty: 10, unitCost: 129, variance: 0 },
-    ],
-    landedCosts: [
-      { id: "1", type: "shipping", description: "Ground Shipping", amount: 120 },
-    ],
-  },
-];
-
 const statusColors: Record<string, string> = {
   pending: "bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))]",
   verified: "bg-[hsl(var(--info))]/10 text-[hsl(var(--info))]",
   completed: "bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]",
 };
 
+// ---- adapter: backend -> UI shape (no UI changes) ----
+function toDate(v?: string | null): Date {
+  const d = v ? new Date(v) : null;
+  return d && !isNaN(d.getTime()) ? d : new Date();
+}
+
+function toNumber(v?: number | null): number {
+  return typeof v === "number" && isFinite(v) ? v : 0;
+}
+
+function mapGrn(apiGrn: GrnApi): GRN {
+  const poNumber =
+    apiGrn.purchaseOrder?.poNumber ||
+    apiGrn.purchaseOrder?.number ||
+    "—";
+
+  const supplierName = apiGrn.supplier?.name || "—";
+  const branchName = apiGrn.branch?.name || "—";
+
+  const items: GRNItem[] = (apiGrn.items ?? []).map((it) => {
+    const ordered =
+      toNumber(it.quantityOrdered ?? it.orderedQty ?? it.quantity ?? 0);
+
+    const received =
+      toNumber(it.quantityReceived ?? it.receivedQty ?? it.quantity ?? 0);
+
+    const unitCost = toNumber(it.unitCost);
+
+    return {
+      id: it.id,
+      product: it.product?.name || "—",
+      sku: it.product?.sku || it.product?.code || "—",
+      orderedQty: ordered,
+      receivedQty: received,
+      unitCost,
+      batchNumber: it.batchNumber ?? undefined,
+      expiryDate: it.expiryDate ? new Date(it.expiryDate) : undefined,
+      variance: received - ordered,
+    };
+  });
+
+  const landedCosts: LandedCost[] = (apiGrn.landedCosts ?? []).map((c) => ({
+    id: c.id,
+    type: c.type,
+    description: c.description ?? "",
+    amount: toNumber(c.amount),
+  }));
+
+  const subtotal =
+    apiGrn.subtotal ??
+    items.reduce((s, it) => s + it.receivedQty * it.unitCost, 0);
+
+  const landedCost =
+    apiGrn.landedCost ??
+    landedCosts.reduce((s, c) => s + c.amount, 0);
+
+  const totalAmount = apiGrn.totalAmount ?? subtotal + landedCost;
+
+  return {
+    id: apiGrn.id,
+    grnNumber: apiGrn.grnNumber || "—",
+    poNumber,
+    supplier: supplierName,
+    branch: branchName,
+    status: apiGrn.status,
+    invoiceNumber: apiGrn.invoiceNumber || "—",
+    invoiceDate: toDate(apiGrn.invoiceDate),
+    receivedDate: toDate(apiGrn.receivedDate),
+    subtotal: toNumber(subtotal),
+    landedCost: toNumber(landedCost),
+    totalAmount: toNumber(totalAmount),
+    items,
+    landedCosts,
+  };
+}
+
 export default function GRN() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGRN, setSelectedGRN] = useState<GRN | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  // GRN creation removed - GRN should be created from PO flow
 
-  const filteredGRNs = grns.filter((grn) => {
-    const matchesSearch =
-      grn.grnNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      grn.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      grn.poNumber.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === "all" || grn.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  // ✅ real data
+  const [grns, setGrns] = useState<GRN[]>([]);
+
+  async function loadGrns(q?: { search?: string; status?: string }) {
+    const query: any = {};
+    if (q?.search?.trim()) query.search = q.search.trim();
+    if (q?.status && q.status !== "all") query.status = q.status;
+
+    const res = await listGrns(query);
+    const list = Array.isArray(res) ? res : res.data;
+    setGrns((list ?? []).map(mapGrn));
+  }
+
+  useEffect(() => {
+    loadGrns({ search: searchQuery, status: statusFilter });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      loadGrns({ search: searchQuery, status: statusFilter });
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
+  const filteredGRNs = useMemo(() => {
+    // keep your existing UI-side filter too (no UI change)
+    return grns.filter((grn) => {
+      const matchesSearch =
+        grn.grnNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        grn.supplier.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        grn.poNumber.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === "all" || grn.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [grns, searchQuery, statusFilter]);
 
   const pendingCount = grns.filter((g) => g.status === "pending").length;
   const totalLandedCost = grns.reduce((sum, g) => sum + g.landedCost, 0);
+
+  async function openDetails(grnId: string) {
+    const full = await getGrn(grnId);
+    setSelectedGRN(mapGrn(full));
+  }
+
+  async function verifyGrn(grnId: string) {
+    // ⚠️ if your backend expects different fields, share UpdateGrnVerificationDto and I’ll match it
+    await setGrnVerification(grnId, { status: "verified" });
+    await loadGrns({ search: searchQuery, status: statusFilter });
+
+    if (selectedGRN?.id === grnId) {
+      const full = await getGrn(grnId);
+      setSelectedGRN(mapGrn(full));
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -284,22 +241,13 @@ export default function GRN() {
           <h1 className="text-2xl font-bold text-foreground">Goods Received Notes</h1>
           <p className="text-muted-foreground">Manage goods receipts and landed costs</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New GRN
-          </Button>
-        </div>
+        <Button variant="outline" size="sm">
+          <Download className="h-4 w-4 mr-2" />
+          Export
+        </Button>
       </div>
 
-      <CreateGRNDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-      />
+      {/* GRN creation dialog removed - GRNs are created from PO flow */}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -332,7 +280,9 @@ export default function GRN() {
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Value Received</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">${grns.reduce((s, g) => s + g.totalAmount, 0).toFixed(2)}</p>
+            <p className="text-2xl font-bold">
+              ${grns.reduce((s, g) => s + g.totalAmount, 0).toFixed(2)}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -415,14 +365,14 @@ export default function GRN() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-popover">
-                          <DialogTrigger asChild onClick={() => setSelectedGRN(grn)}>
+                          <DialogTrigger asChild onClick={() => openDetails(grn.id)}>
                             <DropdownMenuItem>
                               <Eye className="mr-2 h-4 w-4" />
                               View Details
                             </DropdownMenuItem>
                           </DialogTrigger>
                           {grn.status === "pending" && (
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => verifyGrn(grn.id)}>
                               <CheckCircle className="mr-2 h-4 w-4" />
                               Verify GRN
                             </DropdownMenuItem>
@@ -447,6 +397,7 @@ export default function GRN() {
                               <TabsTrigger value="landed-costs">Landed Costs</TabsTrigger>
                               <TabsTrigger value="summary">Summary</TabsTrigger>
                             </TabsList>
+
                             <TabsContent value="items" className="space-y-4">
                               <div className="grid grid-cols-3 gap-4 text-sm">
                                 <div>
@@ -462,6 +413,7 @@ export default function GRN() {
                                   <p className="font-medium">{selectedGRN.invoiceNumber}</p>
                                 </div>
                               </div>
+
                               <Table>
                                 <TableHeader>
                                   <TableRow>
@@ -481,7 +433,9 @@ export default function GRN() {
                                         <div>
                                           {item.product}
                                           {item.batchNumber && (
-                                            <p className="text-xs text-muted-foreground">Batch: {item.batchNumber}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              Batch: {item.batchNumber}
+                                            </p>
                                           )}
                                         </div>
                                       </TableCell>
@@ -497,7 +451,8 @@ export default function GRN() {
                                                 : "bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]"
                                             }
                                           >
-                                            {item.variance > 0 ? "+" : ""}{item.variance}
+                                            {item.variance > 0 ? "+" : ""}
+                                            {item.variance}
                                           </Badge>
                                         ) : (
                                           <span className="text-muted-foreground">-</span>
@@ -512,6 +467,7 @@ export default function GRN() {
                                 </TableBody>
                               </Table>
                             </TabsContent>
+
                             <TabsContent value="landed-costs" className="space-y-4">
                               <div className="flex justify-between items-center">
                                 <h3 className="font-medium">Landed Cost Components</h3>
@@ -520,6 +476,7 @@ export default function GRN() {
                                   Add Cost
                                 </Button>
                               </div>
+
                               {selectedGRN.landedCosts.length > 0 ? (
                                 <Table>
                                   <TableHeader>
@@ -534,12 +491,18 @@ export default function GRN() {
                                       <TableRow key={cost.id}>
                                         <TableCell className="capitalize">{cost.type}</TableCell>
                                         <TableCell>{cost.description}</TableCell>
-                                        <TableCell className="text-right font-medium">${cost.amount.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-medium">
+                                          ${cost.amount.toFixed(2)}
+                                        </TableCell>
                                       </TableRow>
                                     ))}
                                     <TableRow className="bg-muted/50">
-                                      <TableCell colSpan={2} className="font-medium">Total Landed Cost</TableCell>
-                                      <TableCell className="text-right font-bold">${selectedGRN.landedCost.toFixed(2)}</TableCell>
+                                      <TableCell colSpan={2} className="font-medium">
+                                        Total Landed Cost
+                                      </TableCell>
+                                      <TableCell className="text-right font-bold">
+                                        ${selectedGRN.landedCost.toFixed(2)}
+                                      </TableCell>
                                     </TableRow>
                                   </TableBody>
                                 </Table>
@@ -550,6 +513,7 @@ export default function GRN() {
                                 </div>
                               )}
                             </TabsContent>
+
                             <TabsContent value="summary" className="space-y-4">
                               <div className="grid grid-cols-2 gap-6">
                                 <div className="space-y-4">
@@ -569,6 +533,7 @@ export default function GRN() {
                                     </div>
                                   </div>
                                 </div>
+
                                 <div className="space-y-4">
                                   <h3 className="font-medium">Cost Summary</h3>
                                   <div className="space-y-2 text-sm">

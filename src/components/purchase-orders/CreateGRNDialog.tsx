@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -15,11 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Form,
   FormControl,
@@ -46,6 +42,14 @@ import {
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
+// ✅ backend
+import { listBranches } from "@/features/branches/branches.api";
+import type { Branch } from "@/features/branches/branches.types";
+import { getPurchaseOrder } from "@/features/procurement/purchase-orders/purchase-orders.api";
+import type { PurchaseOrder as ApiPurchaseOrder } from "@/features/procurement/purchase-orders/purchase-orders.types";
+import { createGrn } from "@/features/procurement/grns/grns.api";
+import type { CreateGrnDto } from "@/features/procurement/grns/grns.types";
+
 const formSchema = z.object({
   invoiceNumber: z.string().optional(),
   invoiceDate: z.date().optional(),
@@ -59,15 +63,23 @@ interface PurchaseOrder {
   id: string;
   poNumber: string;
   supplier: string;
+  supplierId?: string;
+  branchId?: string;
   orderDate: string;
   expectedDate: string;
   items: number;
   totalValue: number;
   status: "draft" | "pending" | "approved" | "shipped" | "received" | "partial";
+  lineItems?: ApiPurchaseOrder["items"];
 }
 
+type ApiBranch = Branch;
+
+type ApiPurchaseOrderDetail = ApiPurchaseOrder;
+
 interface GRNLineItem {
-  id: string;
+  id: string; // PO item id
+  productId: string;
   product: string;
   sku: string;
   orderedQty: number;
@@ -77,18 +89,15 @@ interface GRNLineItem {
   unitCost: number;
 }
 
-const mockBranches = [
-  { id: "1", name: "Main Store" },
-  { id: "2", name: "Downtown Branch" },
-  { id: "3", name: "Mall Outlet" },
-];
-
-// Mock line items from the PO
-const mockPOLineItems: GRNLineItem[] = [
-  { id: "1", product: "iPhone 15 Pro 256GB", sku: "IP15P-256", orderedQty: 10, receivedQty: 0, pendingQty: 10, receivingQty: 10, unitCost: 999 },
-  { id: "2", product: "USB-C Cable 2m", sku: "ACC-USBC-2M", orderedQty: 50, receivedQty: 0, pendingQty: 50, receivingQty: 50, unitCost: 15 },
-  { id: "3", product: "Phone Case Clear", sku: "ACC-CASE-CLR", orderedQty: 100, receivedQty: 0, pendingQty: 100, receivingQty: 100, unitCost: 12 },
-];
+function toNumber(v: unknown): number {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
 
 interface CreateGRNDialogProps {
   open: boolean;
@@ -96,13 +105,12 @@ interface CreateGRNDialogProps {
   order: PurchaseOrder | null;
 }
 
-export function CreateGRNDialog({
-  open,
-  onOpenChange,
-  order,
-}: CreateGRNDialogProps) {
+export function CreateGRNDialog({ open, onOpenChange, order }: CreateGRNDialogProps) {
   const { toast } = useToast();
-  const [lineItems, setLineItems] = useState<GRNLineItem[]>(mockPOLineItems);
+
+  const [branches, setBranches] = useState<ApiBranch[]>([]);
+  const [lineItems, setLineItems] = useState<GRNLineItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -113,26 +121,147 @@ export function CreateGRNDialog({
     },
   });
 
+  const activeBranches = useMemo(
+    () => branches.filter((b) => b.isActive !== false),
+    [branches],
+  );
+
+  // ✅ Load branches + PO items when dialog opens
+  useEffect(() => {
+    let alive = true;
+    if (!open || !order?.id) return;
+
+    void (async () => {
+      try {
+        setLoading(true);
+
+        // 1) Branches
+        const br = await listBranches();
+        if (!alive) return;
+        setBranches(Array.isArray(br) ? br : []);
+
+        // preselect branch from header/localStorage if available
+        const savedBranchId = localStorage.getItem("erp.branchId") || "";
+        if (savedBranchId) {
+          form.setValue("branchId", savedBranchId);
+        }
+
+        if (order?.lineItems && order.lineItems.length > 0) {
+          const items: GRNLineItem[] = order.lineItems.map((it) => {
+            const orderedQty = Number(it.quantity ?? 0);
+            const receivedQty = toNumber(it.receivedQty ?? 0);
+            const pendingQty = Math.max(0, orderedQty - receivedQty);
+            const unitCost = toNumber(it.unitCost);
+            const productName =
+              it.product?.name ?? (it as { productName?: string }).productName ?? "Unknown product";
+            const sku = it.product?.sku ?? (it as { sku?: string }).sku ?? "-";
+
+            return {
+              id: it.id,
+              productId: it.productId,
+              product: productName,
+              sku,
+              orderedQty,
+              receivedQty,
+              pendingQty,
+              receivingQty: pendingQty,
+              unitCost,
+            };
+          });
+
+          setLineItems(items);
+
+          if (!savedBranchId && order.branchId) {
+            form.setValue("branchId", order.branchId);
+            localStorage.setItem("erp.branchId", order.branchId);
+          }
+
+          return;
+        }
+
+        // 2) PO detail (items)
+        let detail: ApiPurchaseOrderDetail | null = null;
+        try {
+          detail = await getPurchaseOrder(order.id);
+        } catch (e: any) {
+          toast({
+            title: "Error",
+            description: e?.message || "Failed to load purchase order details",
+            variant: "destructive",
+          });
+        }
+        if (!alive) return;
+
+        const sourceItems = detail?.items ?? order?.lineItems ?? [];
+        const items: GRNLineItem[] = sourceItems.map((it) => {
+          const orderedQty = Number(it.quantity ?? 0);
+          const receivedQty = toNumber(it.receivedQty ?? 0); // backend may not provide -> 0
+          const pendingQty = Math.max(0, orderedQty - receivedQty);
+          const unitCost = toNumber(it.unitCost);
+          const productName =
+            it.product?.name ?? (it as { productName?: string }).productName ?? "Unknown product";
+          const sku = it.product?.sku ?? (it as { sku?: string }).sku ?? "-";
+
+          return {
+            id: it.id,
+            productId: it.productId,
+            product: productName,
+            sku,
+            orderedQty,
+            receivedQty,
+            pendingQty,
+            receivingQty: pendingQty, // default receive all pending
+            unitCost,
+          };
+        });
+
+        setLineItems(items);
+
+        // if backend provides branchId in PO, prefer it if no saved branch
+        const poBranchId = detail?.branchId ?? "";
+        if (!savedBranchId && poBranchId) {
+          form.setValue("branchId", poBranchId);
+          localStorage.setItem("erp.branchId", poBranchId);
+        }
+      } catch (e: any) {
+        toast({
+          title: "Error",
+          description: e?.message || "Failed to load GRN data",
+          variant: "destructive",
+        });
+        setLineItems([]);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [open, order?.id, form, toast]);
+
   const updateReceivingQty = (id: string, qty: number) => {
-    setLineItems(
-      lineItems.map((item) => {
+    setLineItems((prev) =>
+      prev.map((item) => {
         if (item.id === id) {
           const newQty = Math.max(0, Math.min(qty, item.pendingQty));
           return { ...item, receivingQty: newQty };
         }
         return item;
-      })
+      }),
     );
   };
 
-  const totalReceiving = lineItems.reduce(
-    (sum, item) => sum + item.receivingQty * item.unitCost,
-    0
+  const totalReceiving = useMemo(
+    () => lineItems.reduce((sum, item) => sum + item.receivingQty * item.unitCost, 0),
+    [lineItems],
   );
 
-  const onSubmit = (values: FormValues) => {
+  const onSubmit = async (values: FormValues) => {
+    if (!order?.id) return;
+
     const itemsToReceive = lineItems.filter((item) => item.receivingQty > 0);
-    
+
     if (itemsToReceive.length === 0) {
       toast({
         title: "Error",
@@ -142,30 +271,49 @@ export function CreateGRNDialog({
       return;
     }
 
-    console.log("Creating GRN:", {
-      poNumber: order?.poNumber,
-      supplier: order?.supplier,
-      branch: mockBranches.find((b) => b.id === values.branchId)?.name,
-      invoiceNumber: values.invoiceNumber,
-      invoiceDate: values.invoiceDate,
-      notes: values.notes,
-      items: itemsToReceive,
-      totalValue: totalReceiving,
-    });
+    try {
+      const payload: CreateGrnDto = {
+        poId: order.id,
+        purchaseOrderId: order.id,
+        branchId: values.branchId || undefined,
+        invoiceNumber: values.invoiceNumber || undefined,
+        supplierInvoiceNo: values.invoiceNumber || undefined,
+        invoiceDate: values.invoiceDate ? values.invoiceDate.toISOString() : undefined,
+        supplierInvoiceDate: values.invoiceDate ? values.invoiceDate.toISOString() : undefined,
+        notes: values.notes || undefined,
+        items: itemsToReceive.map((item) => ({
+          productId: item.productId,
+          quantity: item.receivingQty,
+          unitCost: item.unitCost,
+        })),
+      };
 
-    toast({
-      title: "GRN Created",
-      description: `Goods received for ${order?.poNumber}`,
-    });
+      await createGrn(payload);
 
-    form.reset();
-    setLineItems(mockPOLineItems);
-    onOpenChange(false);
+      toast({
+        title: "GRN Created",
+        description: `Goods received for ${order.poNumber}`,
+      });
+
+      // Let other pages refresh if they want
+      window.dispatchEvent(new Event("grns:changed"));
+      window.dispatchEvent(new Event("purchase-orders:changed"));
+
+      form.reset();
+      setLineItems([]);
+      onOpenChange(false);
+    } catch (e: any) {
+      toast({
+        title: "Error",
+        description: e?.message || "Failed to create GRN",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleClose = () => {
     form.reset();
-    setLineItems(mockPOLineItems);
+    setLineItems([]);
     onOpenChange(false);
   };
 
@@ -198,18 +346,34 @@ export function CreateGRNDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Receiving Branch</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        localStorage.setItem("erp.branchId", value);
+                      }}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select branch" />
+                          <SelectValue placeholder={loading ? "Loading..." : "Select branch"} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {mockBranches.map((branch) => (
-                          <SelectItem key={branch.id} value={branch.id}>
-                            {branch.name}
+                        {loading ? (
+                          <SelectItem value="__loading" disabled>
+                            Loading...
                           </SelectItem>
-                        ))}
+                        ) : activeBranches.length === 0 ? (
+                          <SelectItem value="__empty" disabled>
+                            No branches found
+                          </SelectItem>
+                        ) : (
+                          activeBranches.map((branch) => (
+                            <SelectItem key={branch.id} value={branch.id}>
+                              {branch.name}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -244,14 +408,10 @@ export function CreateGRNDialog({
                             variant="outline"
                             className={cn(
                               "w-full pl-3 text-left font-normal",
-                              !field.value && "text-muted-foreground"
+                              !field.value && "text-muted-foreground",
                             )}
                           >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
@@ -289,47 +449,59 @@ export function CreateGRNDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {lineItems.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.product}</TableCell>
-                        <TableCell className="font-mono text-sm text-muted-foreground">
-                          {item.sku}
+                    {loading ? (
+                      <TableRow>
+                        <TableCell colSpan={8}>Loading...</TableCell>
+                      </TableRow>
+                    ) : lineItems.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8}>No items</TableCell>
+                      </TableRow>
+                    ) : (
+                      lineItems.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell className="font-medium">{item.product}</TableCell>
+                          <TableCell className="font-mono text-sm text-muted-foreground">
+                            {item.sku}
+                          </TableCell>
+                          <TableCell className="text-center">{item.orderedQty}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline">{item.receivedQty}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary">{item.pendingQty}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={item.pendingQty}
+                              value={item.receivingQty}
+                              onChange={(e) =>
+                                updateReceivingQty(item.id, parseInt(e.target.value) || 0)
+                              }
+                              className="w-20 text-center mx-auto"
+                            />
+                          </TableCell>
+                          <TableCell className="text-right">
+                            ${item.unitCost.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            ${(item.receivingQty * item.unitCost).toLocaleString()}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                    {!loading && lineItems.length > 0 && (
+                      <TableRow className="bg-muted/30">
+                        <TableCell colSpan={7} className="text-right font-medium">
+                          Total Value:
                         </TableCell>
-                        <TableCell className="text-center">{item.orderedQty}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="outline">{item.receivedQty}</Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary">{item.pendingQty}</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min={0}
-                            max={item.pendingQty}
-                            value={item.receivingQty}
-                            onChange={(e) =>
-                              updateReceivingQty(item.id, parseInt(e.target.value) || 0)
-                            }
-                            className="w-20 text-center mx-auto"
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          ${item.unitCost.toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          ${(item.receivingQty * item.unitCost).toLocaleString()}
+                        <TableCell className="text-right font-bold">
+                          ${totalReceiving.toLocaleString()}
                         </TableCell>
                       </TableRow>
-                    ))}
-                    <TableRow className="bg-muted/30">
-                      <TableCell colSpan={7} className="text-right font-medium">
-                        Total Value:
-                      </TableCell>
-                      <TableCell className="text-right font-bold">
-                        ${totalReceiving.toLocaleString()}
-                      </TableCell>
-                    </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -359,7 +531,7 @@ export function CreateGRNDialog({
               <Button type="button" variant="outline" onClick={handleClose}>
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" disabled={loading}>
                 <Package className="h-4 w-4 mr-2" />
                 Create GRN
               </Button>
