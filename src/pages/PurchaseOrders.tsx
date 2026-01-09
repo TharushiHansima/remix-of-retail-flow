@@ -11,6 +11,8 @@ import {
   Clock,
   Package,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -304,12 +306,28 @@ export default function PurchaseOrders() {
 
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={8}>Loading...</TableCell>
-              </TableRow>
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell className="text-center"><Skeleton className="h-4 w-8 mx-auto" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                </TableRow>
+              ))
             ) : filteredOrders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8}>No purchase orders found</TableCell>
+                <TableCell colSpan={8} className="h-48">
+                  <EmptyState
+                    variant={searchQuery ? "no-results" : "no-data"}
+                    title={searchQuery ? "No orders match your search" : "No purchase orders yet"}
+                    description={searchQuery ? "Try different search terms" : "Get started by creating your first purchase order"}
+                    action={!searchQuery ? { label: "New Purchase Order", onClick: () => setIsCreateDialogOpen(true) } : undefined}
+                  />
+                </TableCell>
               </TableRow>
             ) : (
               filteredOrders.map((order) => {

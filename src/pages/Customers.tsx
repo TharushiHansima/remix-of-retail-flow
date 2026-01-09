@@ -12,6 +12,8 @@ import {
   MapPin,
   CreditCard,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -284,13 +286,39 @@ export default function Customers() {
           </TableHeader>
 
           <TableBody>
-            {loading ? (
+            {filteredCustomers.length === 0 ? (
               <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="py-10 text-center text-muted-foreground"
-                >
-                  Loading...
+                <TableCell colSpan={8} className="h-48">
+                  <EmptyState
+                    variant={searchQuery ? "no-results" : "no-data"}
+                    title={searchQuery ? "No customers match your search" : "No customers yet"}
+                    description={searchQuery ? "Try different search terms" : "Get started by adding your first customer"}
+                    action={!searchQuery ? { label: "Add Customer", onClick: () => setIsAddDialogOpen(true) } : undefined}
+                  />
+                </TableCell>
+              </TableRow>
+            ) : (
+            filteredCustomers.map((customer) => (
+              <TableRow key={customer.id} className="hover:bg-muted/30">
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-primary/10 text-primary">
+                        {customer.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-card-foreground">{customer.name}</p>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MapPin className="h-3 w-3" />
+                        <span className="truncate max-w-48">{customer.address}</span>
+                      </div>
+                    </div>
+                  </div>
                 </TableCell>
               </TableRow>
             ) : filteredCustomers.length === 0 ? (
@@ -302,117 +330,7 @@ export default function Customers() {
                   No customers found
                 </TableCell>
               </TableRow>
-            ) : (
-              filteredCustomers.map((customer) => (
-                <TableRow key={customer.id} className="hover:bg-muted/30">
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {(customer.name || "NA")
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .slice(0, 2)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium text-card-foreground">
-                          {customer.name}
-                        </p>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <MapPin className="h-3 w-3" />
-                          <span className="truncate max-w-48">
-                            {customer.address ?? "—"}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1 text-sm">
-                        <Mail className="h-3 w-3 text-muted-foreground" />
-                        <span>{customer.email ?? "—"}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Phone className="h-3 w-3" />
-                        <span>{customer.phone ?? "—"}</span>
-                      </div>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <Badge variant="outline">
-                      {customer.type === "business"
-                        ? "Business"
-                        : "Individual"}
-                    </Badge>
-                  </TableCell>
-
-                  <TableCell className="text-right">
-                    {Number(customer.creditLimit || 0) > 0 ? (
-                      <div className="flex items-center justify-end gap-1">
-                        <CreditCard className="h-3 w-3 text-muted-foreground" />
-                        <span>
-                          ${Number(customer.creditLimit || 0).toLocaleString()}
-                        </span>
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-
-                  <TableCell className="text-right">
-                    {Number(customer.balance || 0) > 0 ? (
-                      <span className="font-medium text-[hsl(var(--warning))]">
-                        ${Number(customer.balance || 0).toLocaleString()}
-                      </span>
-                    ) : (
-                      <span className="text-[hsl(var(--success))]">$0</span>
-                    )}
-                  </TableCell>
-
-                  <TableCell className="text-right font-medium">
-                    ${Number(customer.totalPurchases || 0).toLocaleString()}
-                  </TableCell>
-
-                  <TableCell className="text-muted-foreground text-sm">
-                    {customer.lastVisit ?? "—"}
-                  </TableCell>
-
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-popover">
-                        <DropdownMenuItem
-                          onClick={() => handleViewProfile(customer)}
-                        >
-                          <Eye className="mr-2 h-4 w-4" />
-                          View Profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleEditCustomer(customer)}
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Customer
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleViewInvoices(customer)}
-                        >
-                          <FileText className="mr-2 h-4 w-4" />
-                          View Invoices
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+            ))
             )}
           </TableBody>
         </Table>

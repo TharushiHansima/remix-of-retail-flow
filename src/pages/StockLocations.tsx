@@ -33,6 +33,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -151,6 +161,22 @@ const StockLocations = () => {
     },
   });
 
+  const toggleStatusMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const { error } = await supabase
+        .from("stock_locations")
+        .update({ is_active: isActive })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
+      toast.success("Location status updated");
+    },
+  });
+
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("stock_locations").delete().eq("id", id);
@@ -159,6 +185,7 @@ const StockLocations = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stock-locations"] });
       toast.success("Location deleted");
+      setDeleteConfirmId(null);
     },
   });
 
@@ -321,8 +348,15 @@ const StockLocations = () => {
                       {location.description || "-"}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant={location.is_active ? "default" : "secondary"}>
-                        {location.is_active ? "Active" : "Inactive"}
+                      <Badge 
+                        variant={location.is_active ? "default" : "secondary"}
+                        className="cursor-pointer"
+                        onClick={() => toggleStatusMutation.mutate({ 
+                          id: location.id, 
+                          isActive: !location.is_active 
+                        })}
+                      >
+                        {location.is_active ? "Active" : "Disabled"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
@@ -337,7 +371,7 @@ const StockLocations = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => deleteMutation.mutate(location.id)}
+                          onClick={() => setDeleteConfirmId(location.id)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

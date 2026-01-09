@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Search, Pencil, Trash2, Building2, Phone, Mail, User } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
 
 import {
@@ -357,11 +359,26 @@ const Suppliers = () => {
 
         <CardContent>
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
-          ) : filteredSuppliers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              {searchQuery ? "No suppliers match your search" : "No suppliers found. Add your first supplier!"}
+            <div className="space-y-3 p-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <Skeleton className="h-10 w-10 rounded" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-3 w-32" />
+                  </div>
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-8 w-24" />
+                </div>
+              ))}
             </div>
+          ) : filteredSuppliers.length === 0 ? (
+            <EmptyState
+              variant={searchQuery ? "no-results" : "no-data"}
+              title={searchQuery ? "No suppliers match your search" : "No suppliers yet"}
+              description={searchQuery ? "Try different search terms" : "Get started by adding your first supplier"}
+              action={!searchQuery ? { label: "Add Supplier", onClick: () => setIsDialogOpen(true) } : undefined}
+            />
           ) : (
             <Table>
               <TableHeader>

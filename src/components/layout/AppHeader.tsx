@@ -51,8 +51,17 @@ export function AppHeader({ sidebarCollapsed }: AppHeaderProps) {
 
   const userRole = roles[0]?.role || "User";
 
+  // Check if user has admin or manager role
+  const canSeeBranchSelector = useMemo(() => {
+    const role = roles[0]?.role;
+    return role === "admin" || role === "manager";
+  }, [roles]);
+
   // ✅ Load branches once (header is after login, so token exists)
   useEffect(() => {
+    // Only load branches if user can see the selector
+    if (!canSeeBranchSelector) return;
+
     const load = async () => {
       try {
         setBranchesLoading(true);
@@ -80,9 +89,8 @@ export function AppHeader({ sidebarCollapsed }: AppHeaderProps) {
     };
 
     void load();
-    // do NOT add profile in deps; keep behavior stable like your current code style
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [canSeeBranchSelector]);
 
   // ✅ If profile.branch_id changes later, sync selection only if nothing selected yet
   useEffect(() => {
@@ -111,44 +119,46 @@ export function AppHeader({ sidebarCollapsed }: AppHeaderProps) {
       }`}
     >
       <div className="flex h-full items-center justify-between px-6">
-        {/* Branch Selector */}
         <div className="flex items-center gap-4">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2" disabled={branchesLoading}>
-                <span className="font-medium">
-                  {branchesLoading
-                    ? "Loading..."
-                    : selectedBranch?.name || "Select Branch"}
-                </span>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            </DropdownMenuTrigger>
+          {/* Branch Selector - Only for admin and manager */}
+          {canSeeBranchSelector && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2" disabled={branchesLoading}>
+                  <span className="font-medium">
+                    {branchesLoading
+                      ? "Loading..."
+                      : selectedBranch?.name || "Select Branch"}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="start" className="w-56 bg-popover">
-              {branches.length === 0 ? (
-                <DropdownMenuItem disabled>
-                  {branchesLoading ? "Loading branches..." : "No branches found"}
-                </DropdownMenuItem>
-              ) : (
-                branches.map((b) => {
-                  const active = b.isActive ?? true;
-                  if (!active) return null;
+              <DropdownMenuContent align="start" className="w-56 bg-popover">
+                {branches.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    {branchesLoading ? "Loading branches..." : "No branches found"}
+                  </DropdownMenuItem>
+                ) : (
+                  branches.map((b) => {
+                    const active = b.isActive ?? true;
+                    if (!active) return null;
 
-                  const isSelected = b.id === selectedBranchId;
+                    const isSelected = b.id === selectedBranchId;
 
-                  return (
-                    <DropdownMenuItem key={b.id} onClick={() => handleSelectBranch(b.id)}>
-                      <div className="flex items-center justify-between w-full">
-                        <span className="truncate">{b.name}</span>
-                        {isSelected && <Check className="h-4 w-4 text-primary" />}
-                      </div>
-                    </DropdownMenuItem>
-                  );
-                })
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                    return (
+                      <DropdownMenuItem key={b.id} onClick={() => handleSelectBranch(b.id)}>
+                        <div className="flex items-center justify-between w-full">
+                          <span className="truncate">{b.name}</span>
+                          {isSelected && <Check className="h-4 w-4 text-primary" />}
+                        </div>
+                      </DropdownMenuItem>
+                    );
+                  })
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
           {/* Global Search */}
           <div className="relative w-96">
