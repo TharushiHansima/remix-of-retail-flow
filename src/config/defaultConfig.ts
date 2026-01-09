@@ -309,6 +309,8 @@ export const navigationConfig: NavItem[] = [
     children: [
       { id: 'sales', title: 'Sales Reports', href: '/reports/sales' },
       { id: 'inventory', title: 'Inventory Reports', href: '/reports/inventory' },
+      { id: 'valuation', title: 'Inventory Valuation', href: '/reports/valuation' },
+      { id: 'margins', title: 'Profit Margins', href: '/reports/margins' },
       { id: 'repairs', title: 'Repair Reports', href: '/reports/repairs' },
       { id: 'financial', title: 'Financial Summary', href: '/reports/financial' },
       { id: 'scheduled', title: 'Scheduled Reports', href: '/reports/scheduled' },

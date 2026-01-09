@@ -119,6 +119,9 @@ export type CreateProductDto = {
   // ✅ ADDED: wholesale + stock setup fields (match your backend CreateProductDto)
   wholesalePrice?: number;
 
+  // ✅ ADDED: unit weight for weight-based landed cost allocation
+  unitWeight?: number;
+
   // stock settings for product branch initialization (your backend supports these)
   branchId?: UUID; // optional default branch to create ProductBranch
   minStockLevel?: number;
