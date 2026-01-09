@@ -41,6 +41,11 @@ import { AddProductDialog } from "@/components/products/AddProductDialog";
 import { ViewProductDialog } from "@/components/products/ViewProductDialog";
 import { EditProductDialog } from "@/components/products/EditProductDialog";
 import { DeleteProductDialog } from "@/components/products/DeleteProductDialog";
+import { BulkStatusDialog } from "@/components/products/BulkStatusDialog";
+import { BulkCategoryDialog } from "@/components/products/BulkCategoryDialog";
+import { BulkDeleteDialog } from "@/components/products/BulkDeleteDialog";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
 import {
   createProduct,
@@ -208,6 +213,9 @@ export default function Products() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [bulkStatusDialogOpen, setBulkStatusDialogOpen] = useState(false);
+  const [bulkCategoryDialogOpen, setBulkCategoryDialogOpen] = useState(false);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   // ✅ backend data
@@ -366,6 +374,61 @@ export default function Products() {
     setDeleteDialogOpen(true);
   };
 
+  const handleBulkStatusUpdate = useCallback(
+    async (status: "active" | "inactive") => {
+      const isActive = status === "active";
+      let successCount = 0;
+      for (const id of selectedProducts) {
+        try {
+          await updateProduct(id, { isActive });
+          successCount++;
+        } catch {
+          // continue with others
+        }
+      }
+      toast.success(`Updated ${successCount} of ${selectedProducts.length} products`);
+      setSelectedProducts([]);
+      await reloadProducts();
+    },
+    [selectedProducts, reloadProducts],
+  );
+
+  const handleBulkCategoryUpdate = useCallback(
+    async (categoryId: string | null) => {
+      let successCount = 0;
+      for (const id of selectedProducts) {
+        try {
+          await updateProduct(id, { categoryId });
+          successCount++;
+        } catch {
+          // continue with others
+        }
+      }
+      toast.success(`Updated ${successCount} of ${selectedProducts.length} products`);
+      setSelectedProducts([]);
+      await reloadProducts();
+    },
+    [selectedProducts, reloadProducts],
+  );
+
+  const handleBulkDelete = useCallback(
+    async () => {
+      let successCount = 0;
+      for (const id of selectedProducts) {
+        try {
+          await disableProduct(id);
+          successCount++;
+        } catch {
+          // continue with others
+        }
+      }
+      toast.success(`Deleted ${successCount} of ${selectedProducts.length} products`);
+      setSelectedProducts([]);
+      await reloadProducts();
+    },
+    [selectedProducts, reloadProducts],
+  );
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -453,23 +516,17 @@ export default function Products() {
           <span className="text-sm font-medium">
             {selectedProducts.length} selected
           </span>
-          <Button variant="outline" size="sm" onClick={() => {
-            // Bulk update status - toggle active/inactive for selected
-            toast.info("Bulk status update coming soon");
-          }}>
+          <Button variant="outline" size="sm" onClick={() => setBulkStatusDialogOpen(true)}>
             Update Status
           </Button>
-          <Button variant="outline" size="sm" onClick={() => {
-            // Bulk update category
-            toast.info("Bulk category update coming soon");
-          }}>
+          <Button variant="outline" size="sm" onClick={() => setBulkCategoryDialogOpen(true)}>
             Update Category
           </Button>
-          <Button variant="outline" size="sm" className="text-destructive" onClick={() => {
-            // Bulk delete
-            toast.info("Bulk delete coming soon");
-          }}>
+          <Button variant="outline" size="sm" className="text-destructive" onClick={() => setBulkDeleteDialogOpen(true)}>
             Delete
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedProducts([])}>
+            Clear selection
           </Button>
         </div>
       )}
@@ -498,12 +555,38 @@ export default function Products() {
 
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={9}>Loading...</TableCell>
-              </TableRow>
+              // Loading skeleton rows
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-lg" />
+                      <div className="space-y-1">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20 mx-auto" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-8 w-8" /></TableCell>
+                </TableRow>
+              ))
             ) : filteredProducts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9}>No products found</TableCell>
+                <TableCell colSpan={9} className="h-48">
+                  <EmptyState
+                    variant={searchQuery || categoryFilter !== "all" || brandFilter !== "all" ? "no-results" : "no-data"}
+                    title={searchQuery ? "No products match your search" : "No products yet"}
+                    description={searchQuery ? "Try different search terms or clear filters" : "Get started by adding your first product"}
+                    action={!searchQuery ? { label: "Add Product", onClick: () => setAddDialogOpen(true) } : undefined}
+                  />
+                </TableCell>
               </TableRow>
             ) : (
               filteredProducts.map((product) => (
@@ -628,6 +711,25 @@ export default function Products() {
         onOpenChange={setDeleteDialogOpen}
         product={selectedProduct}
         onConfirm={handleDisableProduct}
+      />
+      <BulkStatusDialog
+        open={bulkStatusDialogOpen}
+        onOpenChange={setBulkStatusDialogOpen}
+        selectedCount={selectedProducts.length}
+        onConfirm={handleBulkStatusUpdate}
+      />
+      <BulkCategoryDialog
+        open={bulkCategoryDialogOpen}
+        onOpenChange={setBulkCategoryDialogOpen}
+        selectedCount={selectedProducts.length}
+        categories={categories}
+        onConfirm={handleBulkCategoryUpdate}
+      />
+      <BulkDeleteDialog
+        open={bulkDeleteDialogOpen}
+        onOpenChange={setBulkDeleteDialogOpen}
+        selectedCount={selectedProducts.length}
+        onConfirm={handleBulkDelete}
       />
     </div>
   );

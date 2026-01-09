@@ -12,6 +12,8 @@ import {
   MapPin,
   CreditCard,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -240,7 +242,19 @@ export default function Customers() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredCustomers.map((customer) => (
+            {filteredCustomers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-48">
+                  <EmptyState
+                    variant={searchQuery ? "no-results" : "no-data"}
+                    title={searchQuery ? "No customers match your search" : "No customers yet"}
+                    description={searchQuery ? "Try different search terms" : "Get started by adding your first customer"}
+                    action={!searchQuery ? { label: "Add Customer", onClick: () => setIsAddDialogOpen(true) } : undefined}
+                  />
+                </TableCell>
+              </TableRow>
+            ) : (
+            filteredCustomers.map((customer) => (
               <TableRow key={customer.id} className="hover:bg-muted/30">
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -328,7 +342,8 @@ export default function Customers() {
                   </DropdownMenu>
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
       </div>
