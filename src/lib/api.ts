@@ -10,9 +10,14 @@ const BASE_URL = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000")
 
 const ACCESS_TOKEN_KEY = "erp.accessToken";
 const REFRESH_TOKEN_KEY = "erp.refreshToken";
+const BRANCH_ID_KEY = "erp.branchId";
 
 export function getAccessToken() {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
+}
+
+function getBranchId() {
+  return localStorage.getItem(BRANCH_ID_KEY);
 }
 
 export function setTokens(tokens: { accessToken: string; refreshToken?: string }) {
@@ -52,6 +57,9 @@ export async function api<T>(
     const token = getAccessToken();
     if (token) headers.set("Authorization", `Bearer ${token}`);
   }
+
+  const branchId = getBranchId();
+  if (branchId) headers.set("X-Branch-Id", branchId);
 
   const res = await fetch(url, {
     ...options,

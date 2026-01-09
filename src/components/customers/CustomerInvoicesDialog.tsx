@@ -17,7 +17,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+
+import { customersApi } from "@/features/customers/customers.api";
 
 interface Customer {
   id: string;
@@ -39,6 +40,17 @@ interface CustomerInvoicesDialogProps {
   customer: Customer | null;
 }
 
+type InvoiceStatus = "draft" | "pending" | "paid" | "partial" | "overdue";
+
+type InvoiceUI = {
+  id: string;
+  invoiceNumber: string;
+  date: Date;
+  totalAmount: number;
+  paidAmount: number;
+  status: InvoiceStatus;
+};
+
 const statusColors: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
   pending: "bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))]",
@@ -47,41 +59,48 @@ const statusColors: Record<string, string> = {
   overdue: "bg-destructive/10 text-destructive",
 };
 
-// Mock invoices - in production this would fetch from database
-const mockInvoices = [
-  {
-    id: "1",
-    invoiceNumber: "INV-2024-0125",
-    date: new Date("2024-01-25"),
-    totalAmount: 2450,
-    paidAmount: 2450,
-    status: "paid",
-  },
-  {
-    id: "2",
-    invoiceNumber: "INV-2024-0118",
-    date: new Date("2024-01-18"),
-    totalAmount: 1850,
-    paidAmount: 1000,
-    status: "partial",
-  },
-  {
-    id: "3",
-    invoiceNumber: "INV-2024-0110",
-    date: new Date("2024-01-10"),
-    totalAmount: 3200,
-    paidAmount: 3200,
-    status: "paid",
-  },
-  {
-    id: "4",
-    invoiceNumber: "INV-2024-0105",
-    date: new Date("2024-01-05"),
-    totalAmount: 980,
-    paidAmount: 0,
-    status: "pending",
-  },
-];
+function normalizeListResponse<T>(res: any): T[] {
+  if (Array.isArray(res)) return res as T[];
+  if (res?.items && Array.isArray(res.items)) return res.items as T[];
+  return [];
+}
+
+/**
+ * Tries to map any backend invoice-ish record to the UI shape.
+ * Works with common field names:
+ * - invoiceNumber / number / code
+ * - createdAt / date / issuedAt
+ * - total / totalAmount / grandTotal
+ * - paid / paidAmount
+ * - status
+ */
+function toInvoiceUI(raw: any): InvoiceUI {
+  const id = String(raw.id ?? raw.invoiceId ?? "");
+  const invoiceNumber = String(
+    raw.invoiceNumber ??
+      raw.number ??
+      raw.code ??
+      raw.documentNo ??
+      raw.invoice_no ??
+      id,
+  );
+
+  const dateVal = raw.date ?? raw.issuedAt ?? raw.createdAt ?? raw.updatedAt;
+  const date = dateVal ? new Date(dateVal) : new Date();
+
+  const totalAmount = Number(
+    raw.totalAmount ?? raw.total ?? raw.grandTotal ?? raw.amount ?? 0,
+  );
+  const paidAmount = Number(raw.paidAmount ?? raw.paid ?? raw.received ?? 0);
+
+  const st = String(raw.status ?? "pending").toLowerCase();
+  const status: InvoiceStatus =
+    st === "draft" || st === "pending" || st === "paid" || st === "partial" || st === "overdue"
+      ? (st as InvoiceStatus)
+      : "pending";
+
+  return { id, invoiceNumber, date, totalAmount, paidAmount, status };
+}
 
 export function CustomerInvoicesDialog({
   open,
@@ -90,7 +109,26 @@ export function CustomerInvoicesDialog({
 }: CustomerInvoicesDialogProps) {
   if (!customer) return null;
 
-  const totalOutstanding = mockInvoices
+  /**
+   * ✅ Backend connection
+   *
+   * This expects you to add `customersApi.listInvoices(customerId)` in customers.api.ts.
+   * (snippet below)
+   */
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["customer-invoices", customer.id],
+    enabled: open && !!customer?.id,
+    queryFn: async () => {
+      const res = await customersApi.listInvoices(customer.id);
+      const items = normalizeListResponse<any>(res);
+      return items.map(toInvoiceUI);
+    },
+  });
+
+  const invoices = data ?? [];
+
+  const totalValue = invoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
+  const totalOutstanding = invoices
     .filter((inv) => inv.status !== "paid")
     .reduce((sum, inv) => sum + (inv.totalAmount - inv.paidAmount), 0);
 
@@ -113,17 +151,23 @@ export function CustomerInvoicesDialog({
         <div className="grid grid-cols-3 gap-4">
           <div className="p-3 rounded-lg bg-muted/50">
             <p className="text-sm text-muted-foreground">Total Invoices</p>
-            <p className="text-xl font-semibold">{mockInvoices.length}</p>
+            <p className="text-xl font-semibold">{invoices.length}</p>
           </div>
           <div className="p-3 rounded-lg bg-muted/50">
             <p className="text-sm text-muted-foreground">Total Value</p>
             <p className="text-xl font-semibold">
-              ${mockInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0).toLocaleString()}
+              ${totalValue.toLocaleString()}
             </p>
           </div>
           <div className="p-3 rounded-lg bg-muted/50">
             <p className="text-sm text-muted-foreground">Outstanding</p>
-            <p className={`text-xl font-semibold ${totalOutstanding > 0 ? "text-[hsl(var(--warning))]" : "text-[hsl(var(--success))]"}`}>
+            <p
+              className={`text-xl font-semibold ${
+                totalOutstanding > 0
+                  ? "text-[hsl(var(--warning))]"
+                  : "text-[hsl(var(--success))]"
+              }`}
+            >
               ${totalOutstanding.toLocaleString()}
             </p>
           </div>
@@ -143,8 +187,25 @@ export function CustomerInvoicesDialog({
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
+
             <TableBody>
-              {mockInvoices.map((invoice) => (
+              {isLoading && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    Loading invoices...
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {isError && (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8 text-destructive">
+                    {(error as any)?.message || "Failed to load invoices"}
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {!isLoading && !isError && invoices.map((invoice) => (
                 <TableRow key={invoice.id}>
                   <TableCell className="font-mono font-medium">
                     {invoice.invoiceNumber}
@@ -167,13 +228,22 @@ export function CustomerInvoicesDialog({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => {
+                        // Optional: open invoice details page if you have one
+                        // window.open(`/sales/invoices/${invoice.id}`, "_blank");
+                      }}
+                    >
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
-              {mockInvoices.length === 0 && (
+
+              {!isLoading && !isError && invoices.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No invoices found for this customer

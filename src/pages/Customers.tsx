@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Plus,
@@ -12,6 +12,8 @@ import {
   MapPin,
   CreditCard,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +37,16 @@ import { ViewCustomerDialog } from "@/components/customers/ViewCustomerDialog";
 import { EditCustomerDialog } from "@/components/customers/EditCustomerDialog";
 import { CustomerInvoicesDialog } from "@/components/customers/CustomerInvoicesDialog";
 
-interface Customer {
+import { customersApi } from "@/features/customers/customers.api";
+import type {
+  Customer as CustomerApi,
+  CustomersStats,
+} from "@/features/customers/customers.types";
+
+/** =========================
+ * UI Customer (keep old UI shape)
+ * ========================= */
+interface CustomerUI {
   id: string;
   name: string;
   email: string;
@@ -46,106 +57,119 @@ interface Customer {
   balance: number;
   totalPurchases: number;
   lastVisit: string;
+  isActive: boolean;
   status: "active" | "inactive";
 }
 
-const customers: Customer[] = [
-  {
-    id: "1",
-    name: "John Smith",
-    email: "john.smith@email.com",
-    phone: "+1 234 567 8901",
-    address: "123 Main St, New York, NY",
-    type: "individual",
-    creditLimit: 5000,
-    balance: 1250,
-    totalPurchases: 15420,
-    lastVisit: "2024-01-28",
-    status: "active",
-  },
-  {
-    id: "2",
-    name: "ABC Corporation",
-    email: "accounts@abccorp.com",
-    phone: "+1 234 567 8902",
-    address: "456 Business Ave, Los Angeles, CA",
-    type: "business",
-    creditLimit: 50000,
-    balance: 12500,
-    totalPurchases: 245000,
-    lastVisit: "2024-01-27",
-    status: "active",
-  },
-  {
-    id: "3",
-    name: "Sarah Davis",
-    email: "sarah.d@email.com",
-    phone: "+1 234 567 8903",
-    address: "789 Oak Lane, Chicago, IL",
-    type: "individual",
-    creditLimit: 2000,
-    balance: 0,
-    totalPurchases: 8750,
-    lastVisit: "2024-01-25",
-    status: "active",
-  },
-  {
-    id: "4",
-    name: "Tech Solutions Inc",
-    email: "info@techsolutions.com",
-    phone: "+1 234 567 8904",
-    address: "321 Innovation Blvd, San Francisco, CA",
-    type: "business",
-    creditLimit: 25000,
-    balance: 5240,
-    totalPurchases: 78900,
-    lastVisit: "2024-01-20",
-    status: "active",
-  },
-  {
-    id: "5",
-    name: "Michael Brown",
-    email: "m.brown@email.com",
-    phone: "+1 234 567 8905",
-    address: "654 Pine St, Seattle, WA",
-    type: "individual",
-    creditLimit: 0,
-    balance: 0,
-    totalPurchases: 2340,
-    lastVisit: "2024-01-15",
-    status: "inactive",
-  },
-];
+function toCustomerUI(c: CustomerApi): CustomerUI {
+  const isActive = Boolean((c as any).isActive);
+  return {
+    id: c.id,
+    name: c.name ?? "",
+    email: c.email ?? "",
+    phone: c.phone ?? "",
+    address: c.address ?? "",
+    type: (c.type ?? "individual") as "individual" | "business",
+    creditLimit: Number((c as any).creditLimit ?? 0),
+    balance: Number((c as any).balance ?? 0),
+    totalPurchases: Number((c as any).totalPurchases ?? 0),
+    lastVisit: (c as any).lastVisit ?? "",
+    isActive,
+    status: isActive ? "active" : "inactive",
+  };
+}
+
+function normalizeListResponse(res: any): { items: CustomerApi[]; total: number } {
+  if (Array.isArray(res)) return { items: res, total: res.length };
+  if (res?.items && Array.isArray(res.items))
+    return { items: res.items, total: Number(res.total ?? res.items.length) };
+  return { items: [], total: 0 };
+}
 
 export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isInvoicesDialogOpen, setIsInvoicesDialogOpen] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
-  const filteredCustomers = customers.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.phone.includes(searchQuery)
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerUI | null>(
+    null,
   );
 
-  const handleViewProfile = (customer: Customer) => {
+  // ✅ real data state
+  const [rows, setRows] = useState<CustomerUI[]>([]);
+  const [stats, setStats] = useState<CustomersStats | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // optional paging
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  const [total, setTotal] = useState(0);
+
+  const fetchAll = async (q: string, p: number) => {
+    setLoading(true);
+    setError(null);
+
+    // ✅ list should load even if stats fails
+    try {
+      const listRes = await customersApi.list({ search: q, page: p, pageSize });
+      const normalized = normalizeListResponse(listRes);
+      setRows(normalized.items.map(toCustomerUI));
+      setTotal(normalized.total);
+    } catch (e: any) {
+      setError(e?.message || "Failed to load customers");
+    }
+
+    // stats should never block table
+    try {
+      const statsRes = await customersApi.stats();
+      setStats(statsRes);
+    } catch {
+      // ignore stats errors
+    }
+
+    setLoading(false);
+  };
+
+  // ✅ debounce search
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetchAll(searchQuery, page);
+    }, 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, page]);
+
+  const filteredCustomers = useMemo(() => {
+    if (!searchQuery) return rows;
+    const s = searchQuery.toLowerCase();
+    return rows.filter(
+      (c) =>
+        (c.name ?? "").toLowerCase().includes(s) ||
+        (c.email ?? "").toLowerCase().includes(s) ||
+        (c.phone ?? "").includes(searchQuery),
+    );
+  }, [rows, searchQuery]);
+
+  const handleViewProfile = (customer: CustomerUI) => {
     setSelectedCustomer(customer);
     setIsViewDialogOpen(true);
   };
 
-  const handleEditCustomer = (customer: Customer) => {
+  const handleEditCustomer = (customer: CustomerUI) => {
     setSelectedCustomer(customer);
     setIsEditDialogOpen(true);
   };
 
-  const handleViewInvoices = (customer: Customer) => {
+  const handleViewInvoices = (customer: CustomerUI) => {
     setSelectedCustomer(customer);
     setIsInvoicesDialogOpen(true);
   };
+
+  const handleRefresh = () => fetchAll(searchQuery, page);
 
   return (
     <div className="space-y-6">
@@ -165,6 +189,7 @@ export default function Customers() {
       <AddCustomerDialog
         open={isAddDialogOpen}
         onOpenChange={setIsAddDialogOpen}
+        onSuccess={handleRefresh}
       />
       <ViewCustomerDialog
         open={isViewDialogOpen}
@@ -175,7 +200,9 @@ export default function Customers() {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
         customer={selectedCustomer}
+        onSuccess={handleRefresh}
       />
+      {/* Uncomment when you wire invoices endpoint */}
       <CustomerInvoicesDialog
         open={isInvoicesDialogOpen}
         onOpenChange={setIsInvoicesDialogOpen}
@@ -186,24 +213,33 @@ export default function Customers() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-card rounded-lg border border-border p-4">
           <p className="text-sm text-muted-foreground">Total Customers</p>
-          <p className="text-2xl font-bold text-card-foreground">{customers.length}</p>
+          <p className="text-2xl font-bold text-card-foreground">
+            {stats ? stats.totalCustomers : "—"}
+          </p>
         </div>
+
         <div className="bg-card rounded-lg border border-border p-4">
           <p className="text-sm text-muted-foreground">Business Accounts</p>
           <p className="text-2xl font-bold text-card-foreground">
-            {customers.filter((c) => c.type === "business").length}
+            {stats ? stats.businessAccounts : "—"}
           </p>
         </div>
+
         <div className="bg-card rounded-lg border border-border p-4">
           <p className="text-sm text-muted-foreground">Total Receivables</p>
           <p className="text-2xl font-bold text-[hsl(var(--warning))]">
-            ${customers.reduce((sum, c) => sum + c.balance, 0).toLocaleString()}
+            {stats
+              ? `$${Number(stats.totalReceivables || 0).toLocaleString()}`
+              : "—"}
           </p>
         </div>
+
         <div className="bg-card rounded-lg border border-border p-4">
           <p className="text-sm text-muted-foreground">Lifetime Value</p>
           <p className="text-2xl font-bold text-[hsl(var(--success))]">
-            ${customers.reduce((sum, c) => sum + c.totalPurchases, 0).toLocaleString()}
+            {stats
+              ? `$${Number(stats.lifetimeValue || 0).toLocaleString()}`
+              : "—"}
           </p>
         </div>
       </div>
@@ -215,7 +251,10 @@ export default function Customers() {
           <Input
             placeholder="Search customers..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setPage(1);
+              setSearchQuery(e.target.value);
+            }}
             className="pl-10"
           />
         </div>
@@ -223,6 +262,12 @@ export default function Customers() {
           <Filter className="h-4 w-4" />
         </Button>
       </div>
+
+      {error && (
+        <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-md p-3 text-sm">
+          {error}
+        </div>
+      )}
 
       {/* Customers Table */}
       <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
@@ -239,8 +284,21 @@ export default function Customers() {
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
-            {filteredCustomers.map((customer) => (
+            {filteredCustomers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-48">
+                  <EmptyState
+                    variant={searchQuery ? "no-results" : "no-data"}
+                    title={searchQuery ? "No customers match your search" : "No customers yet"}
+                    description={searchQuery ? "Try different search terms" : "Get started by adding your first customer"}
+                    action={!searchQuery ? { label: "Add Customer", onClick: () => setIsAddDialogOpen(true) } : undefined}
+                  />
+                </TableCell>
+              </TableRow>
+            ) : (
+            filteredCustomers.map((customer) => (
               <TableRow key={customer.id} className="hover:bg-muted/30">
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -262,75 +320,43 @@ export default function Customers() {
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-1 text-sm">
-                      <Mail className="h-3 w-3 text-muted-foreground" />
-                      <span>{customer.email}</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Phone className="h-3 w-3" />
-                      <span>{customer.phone}</span>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">
-                    {customer.type === "business" ? "Business" : "Individual"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  {customer.creditLimit > 0 ? (
-                    <div className="flex items-center justify-end gap-1">
-                      <CreditCard className="h-3 w-3 text-muted-foreground" />
-                      <span>${customer.creditLimit.toLocaleString()}</span>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">-</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  {customer.balance > 0 ? (
-                    <span className="font-medium text-[hsl(var(--warning))]">
-                      ${customer.balance.toLocaleString()}
-                    </span>
-                  ) : (
-                    <span className="text-[hsl(var(--success))]">$0</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  ${customer.totalPurchases.toLocaleString()}
-                </TableCell>
-                <TableCell className="text-muted-foreground text-sm">
-                  {customer.lastVisit}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-popover">
-                      <DropdownMenuItem onClick={() => handleViewProfile(customer)}>
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEditCustomer(customer)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit Customer
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleViewInvoices(customer)}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        View Invoices
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+              </TableRow>
+            ) : filteredCustomers.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={8}
+                  className="py-10 text-center text-muted-foreground"
+                >
+                  No customers found
                 </TableCell>
               </TableRow>
-            ))}
+            ))
+            )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Optional pagination */}
+      <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+        <span>
+          Showing {rows.length} of {total}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page <= 1 || loading}
+          onClick={() => setPage((p) => p - 1)}
+        >
+          Prev
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={loading || (page * pageSize >= total && total !== 0)}
+          onClick={() => setPage((p) => p + 1)}
+        >
+          Next
+        </Button>
       </div>
     </div>
   );
