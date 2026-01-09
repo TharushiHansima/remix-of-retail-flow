@@ -16,17 +16,24 @@ import {
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { FileText, Truck, CheckCircle2, Clock, Package } from "lucide-react";
-import { http } from "@/lib/http";
+import { getPurchaseOrder } from "@/features/procurement/purchase-orders/purchase-orders.api";
+import type {
+  PurchaseOrder as ApiPurchaseOrder,
+  PurchaseOrderStatus,
+} from "@/features/procurement/purchase-orders/purchase-orders.types";
 
 interface PurchaseOrder {
   id: string;
   poNumber: string;
   supplier: string;
+  supplierId?: string;
+  branchId?: string;
   orderDate: string;
   expectedDate: string;
   items: number;
   totalValue: number;
   status: "draft" | "pending" | "approved" | "shipped" | "received" | "partial";
+  lineItems?: ApiPurchaseOrder["items"];
 }
 
 const statusConfig = {
@@ -38,21 +45,7 @@ const statusConfig = {
   partial: { label: "Partial", color: "bg-[hsl(var(--chart-4))]/10 text-[hsl(var(--chart-4))]", icon: Package },
 };
 
-type ApiPurchaseOrderDetail = {
-  id: string;
-  poNumber?: string;
-  createdAt?: string;
-  expectedDate?: string;
-  status?: string;
-  supplier?: { id: string; name: string } | null;
-  items?: Array<{
-    id: string;
-    productId: string;
-    quantity: number;
-    unitCost: number | string;
-    product?: { id: string; name: string; sku?: string | null } | null;
-  }>;
-};
+type ApiPurchaseOrderDetail = ApiPurchaseOrder;
 
 function toNumber(v: unknown): number {
   if (v === null || v === undefined) return 0;
@@ -68,6 +61,24 @@ function formatDate(iso?: string) {
   if (!iso) return "-";
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? iso : d.toISOString().slice(0, 10);
+}
+
+function mapBackendStatusToUi(status?: PurchaseOrderStatus): PurchaseOrder["status"] {
+  switch (status) {
+    case "draft":
+      return "draft";
+    case "pending_approval":
+      return "pending";
+    case "approved":
+      return "approved";
+    case "partially_received":
+      return "partial";
+    case "received":
+      return "received";
+    case "cancelled":
+    default:
+      return "draft";
+  }
 }
 
 interface ViewPurchaseOrderDialogProps {
@@ -86,15 +97,14 @@ export function ViewPurchaseOrderDialog({
 
   useEffect(() => {
     let alive = true;
+    setDetail(null);
     if (!open || !order?.id) return;
+    if (order?.lineItems && order.lineItems.length > 0) return;
 
     void (async () => {
       try {
         setLoading(true);
-        const res = await http<ApiPurchaseOrderDetail>(
-          `/procurement/purchase-orders/${order.id}`,
-          { method: "GET", auth: true }
-        );
+        const res = await getPurchaseOrder(order.id);
         if (!alive) return;
         setDetail(res ?? null);
       } catch {
@@ -110,12 +120,22 @@ export function ViewPurchaseOrderDialog({
     };
   }, [open, order?.id]);
 
-  if (!order) return null;
+  const safeOrder: PurchaseOrder = order ?? {
+    id: "",
+    poNumber: "",
+    supplier: "",
+    orderDate: "",
+    expectedDate: "",
+    items: 0,
+    totalValue: 0,
+    status: "draft",
+  };
 
-  const statusKey = (detail?.status as PurchaseOrder["status"]) || order.status;
-  const StatusIcon = statusConfig[statusKey].icon;
+  const statusKey = detail?.status ? mapBackendStatusToUi(detail.status) : safeOrder.status;
+  const statusMeta = statusConfig[statusKey] ?? statusConfig.draft;
+  const StatusIcon = statusMeta.icon;
 
-  const lineItems = detail?.items ?? [];
+  const lineItems = detail?.items ?? safeOrder.lineItems ?? [];
   const computedTotal = useMemo(() => {
     return lineItems.reduce(
       (sum, it) => sum + toNumber(it.unitCost) * Number(it.quantity ?? 0),
@@ -123,17 +143,19 @@ export function ViewPurchaseOrderDialog({
     );
   }, [lineItems]);
 
-  const subtotal = computedTotal || order.totalValue;
+  const subtotal = computedTotal || safeOrder.totalValue;
+
+  if (!order) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl">{order.poNumber}</DialogTitle>
-            <Badge className={`gap-1 ${statusConfig[statusKey].color}`}>
+            <DialogTitle className="text-xl">{safeOrder.poNumber}</DialogTitle>
+            <Badge className={`gap-1 ${statusMeta.color}`}>
               <StatusIcon className="h-3 w-3" />
-              {statusConfig[statusKey].label}
+              {statusMeta.label}
             </Badge>
           </div>
         </DialogHeader>
@@ -144,19 +166,19 @@ export function ViewPurchaseOrderDialog({
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Supplier</p>
               <p className="font-medium">
-                {detail?.supplier?.name || order.supplier}
+                {detail?.supplier?.name || safeOrder.supplier}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Order Date</p>
               <p className="font-medium">
-                {detail?.createdAt ? formatDate(detail.createdAt) : order.orderDate}
+                {detail?.createdAt ? formatDate(detail.createdAt) : safeOrder.orderDate}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Expected Delivery</p>
               <p className="font-medium">
-                {detail?.expectedDate ? formatDate(detail.expectedDate) : order.expectedDate}
+                {detail?.expectedDate ? formatDate(detail.expectedDate) : safeOrder.expectedDate}
               </p>
             </div>
             <div className="space-y-1">
@@ -164,7 +186,7 @@ export function ViewPurchaseOrderDialog({
               <p className="font-medium">
                 {lineItems.length > 0
                   ? lineItems.reduce((sum, it) => sum + Number(it.quantity ?? 0), 0)
-                  : order.items}
+                  : safeOrder.items}
               </p>
             </div>
           </div>
@@ -198,13 +220,16 @@ export function ViewPurchaseOrderDialog({
                     lineItems.map((it) => {
                       const qty = Number(it.quantity ?? 0);
                       const unit = toNumber(it.unitCost);
+                      const productName =
+                        it.product?.name ?? (it as { productName?: string }).productName ?? "Unknown product";
+                      const sku = it.product?.sku ?? (it as { sku?: string }).sku ?? "-";
                       return (
                         <TableRow key={it.id}>
                           <TableCell className="font-medium">
-                            {it.product?.name ?? "Unknown product"}
+                            {productName}
                           </TableCell>
                           <TableCell className="font-mono text-sm text-muted-foreground">
-                            {it.product?.sku ?? "-"}
+                            {sku}
                           </TableCell>
                           <TableCell className="text-center">{qty}</TableCell>
                           <TableCell className="text-right">

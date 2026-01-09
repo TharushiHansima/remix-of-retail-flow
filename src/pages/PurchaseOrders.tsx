@@ -45,11 +45,14 @@ interface PurchaseOrder {
   id: string;
   poNumber: string;
   supplier: string;
+  supplierId?: string;
+  branchId?: string;
   orderDate: string;
   expectedDate: string;
   items: number;
   totalValue: number;
   status: "draft" | "pending" | "approved" | "shipped" | "received" | "partial";
+  lineItems?: ApiPO["items"];
 }
 
 const statusConfig = {
@@ -133,6 +136,17 @@ export default function PurchaseOrders() {
 
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    const handler = () => setRefreshKey((key) => key + 1);
+    window.addEventListener("purchase-orders:changed", handler);
+    window.addEventListener("grns:changed", handler);
+    return () => {
+      window.removeEventListener("purchase-orders:changed", handler);
+      window.removeEventListener("grns:changed", handler);
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -160,11 +174,14 @@ export default function PurchaseOrders() {
               id: po.id,
               poNumber: po.poNumber,
               supplier: po.supplier?.name ?? "-",
+              supplierId: po.supplierId,
+              branchId: po.branchId,
               orderDate: formatDate(po.createdAt),
               expectedDate: formatDate(po.expectedDate),
               items: qtySum,
               totalValue: toNumber(po.totalAmount),
               status: mapBackendStatusToUi(po.status),
+              lineItems: po.items ?? [],
             };
           });
 
@@ -184,7 +201,7 @@ export default function PurchaseOrders() {
       alive = false;
       clearTimeout(t);
     };
-  }, [searchQuery, tab]);
+  }, [searchQuery, tab, refreshKey]);
 
   // Keep your UI search filtering behavior too (optional extra safety)
   const filteredOrders = useMemo(() => {
@@ -192,8 +209,8 @@ export default function PurchaseOrders() {
     if (!q) return orders;
     return orders.filter(
       (o) =>
-        o.poNumber.toLowerCase().includes(q) ||
-        o.supplier.toLowerCase().includes(q)
+        (o.poNumber || "").toLowerCase().includes(q) ||
+        (o.supplier || "").toLowerCase().includes(q)
     );
   }, [orders, searchQuery]);
 
@@ -296,7 +313,8 @@ export default function PurchaseOrders() {
               </TableRow>
             ) : (
               filteredOrders.map((order) => {
-                const StatusIcon = statusConfig[order.status].icon;
+                const statusMeta = statusConfig[order.status] ?? statusConfig.draft;
+                const StatusIcon = statusMeta.icon;
                 return (
                   <TableRow key={order.id} className="hover:bg-muted/30">
                     <TableCell className="font-mono font-medium">{order.poNumber}</TableCell>
@@ -308,9 +326,9 @@ export default function PurchaseOrders() {
                       ${order.totalValue.toLocaleString()}
                     </TableCell>
                     <TableCell>
-                      <Badge className={`gap-1 ${statusConfig[order.status].color}`}>
+                      <Badge className={`gap-1 ${statusMeta.color}`}>
                         <StatusIcon className="h-3 w-3" />
-                        {statusConfig[order.status].label}
+                        {statusMeta.label}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -321,15 +339,15 @@ export default function PurchaseOrders() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-popover">
-                          <DropdownMenuItem onClick={() => handleViewDetails(order)}>
+                          <DropdownMenuItem onSelect={() => handleViewDetails(order)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditOrder(order)}>
+                          <DropdownMenuItem onSelect={() => handleEditOrder(order)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Edit Order
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleCreateGRN(order)}>
+                          <DropdownMenuItem onSelect={() => handleCreateGRN(order)}>
                             <Package className="mr-2 h-4 w-4" />
                             Create GRN
                           </DropdownMenuItem>

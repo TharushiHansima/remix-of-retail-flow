@@ -42,9 +42,12 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 // ✅ backend
-import { http } from "@/lib/http";
 import { listProducts } from "@/features/inventory/products/products.api";
 import type { Product as ApiProduct } from "@/features/inventory/products/products.types";
+import { getPurchaseOrder, updatePurchaseOrder } from "@/features/procurement/purchase-orders/purchase-orders.api";
+import type { PurchaseOrder as ApiPurchaseOrder } from "@/features/procurement/purchase-orders/purchase-orders.types";
+import { listSuppliers } from "@/features/procurement/suppliers/suppliers.api";
+import type { Supplier } from "@/features/procurement/suppliers/suppliers.types";
 
 const formSchema = z.object({
   supplierId: z.string().min(1, "Supplier is required"),
@@ -58,11 +61,14 @@ interface PurchaseOrder {
   id: string;
   poNumber: string;
   supplier: string;
+  supplierId?: string;
+  branchId?: string;
   orderDate: string;
   expectedDate: string;
   items: number;
   totalValue: number;
   status: "draft" | "pending" | "approved" | "shipped" | "received" | "partial";
+  lineItems?: ApiPurchaseOrder["items"];
 }
 
 interface LineItem {
@@ -72,27 +78,7 @@ interface LineItem {
   unitCost: number;
 }
 
-type ApiSupplier = {
-  id: string;
-  name: string;
-  isActive?: boolean;
-};
-
-type ApiPurchaseOrderDetail = {
-  id: string;
-  poNumber?: string;
-  expectedDate?: string;
-  notes?: string | null;
-  supplierId?: string | null;
-  supplier?: { id: string; name: string } | null;
-  items?: Array<{
-    id?: string;
-    productId: string;
-    quantity: number;
-    unitCost: number | string;
-    product?: { id: string; name: string; sku?: string | null } | null;
-  }>;
-};
+type ApiSupplier = Supplier;
 
 function toNumber(v: unknown): number {
   if (v === null || v === undefined) return 0;
@@ -102,6 +88,12 @@ function toNumber(v: unknown): number {
     return Number.isFinite(n) ? n : 0;
   }
   return 0;
+}
+
+function toValidDate(value?: string | null): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
 function normalizeProducts(res: any): ApiProduct[] {
@@ -164,10 +156,7 @@ export function EditPurchaseOrderDialog({
 
         // Suppliers
         setLoadingSuppliers(true);
-        const s = await http<ApiSupplier[]>("/procurement/suppliers", {
-          method: "GET",
-          auth: true,
-        });
+        const s = await listSuppliers();
         if (!alive) return;
         setSuppliers(Array.isArray(s) ? s : []);
         setLoadingSuppliers(false);
@@ -180,23 +169,41 @@ export function EditPurchaseOrderDialog({
         setProducts(pItems);
         setLoadingProducts(false);
 
+        if (order?.lineItems && order.lineItems.length > 0) {
+          const expectedDate = toValidDate(order.expectedDate) ?? new Date();
+          form.reset({
+            supplierId: order.supplierId ?? "",
+            expectedDelivery: expectedDate,
+            notes: "",
+          });
+
+          const items = order.lineItems.map((it) => ({
+            productId: it.productId,
+            productName:
+              it.product?.name ||
+              (it as { productName?: string }).productName ||
+              pItems.find((pp) => pp.id === it.productId)?.name ||
+              "Unknown product",
+            quantity: Number(it.quantity ?? 0),
+            unitCost: toNumber(it.unitCost),
+          }));
+
+          setLineItems(items);
+          return;
+        }
+
         // PO detail
-        const detail = await http<ApiPurchaseOrderDetail>(
-          `/procurement/purchase-orders/${order.id}`,
-          { method: "GET", auth: true },
-        );
+        const detail = await getPurchaseOrder(order.id);
         if (!alive) return;
 
-        const supplierId =
-          detail?.supplierId || detail?.supplier?.id || "";
+        const supplierId = detail?.supplierId || detail?.supplier?.id || "";
 
-        const expected =
-          detail?.expectedDate ||
-          (order.expectedDate ? new Date(order.expectedDate).toISOString() : undefined);
+        const expected = detail?.expectedDate || order.expectedDate;
+        const expectedDate = toValidDate(expected) ?? new Date();
 
         form.reset({
           supplierId,
-          expectedDelivery: expected ? new Date(expected) : new Date(),
+          expectedDelivery: expectedDate,
           notes: detail?.notes ?? "",
         });
 
@@ -204,6 +211,7 @@ export function EditPurchaseOrderDialog({
           productId: it.productId,
           productName:
             it.product?.name ||
+            (it as { productName?: string }).productName ||
             pItems.find((pp) => pp.id === it.productId)?.name ||
             "Unknown product",
           quantity: Number(it.quantity ?? 0),
@@ -217,7 +225,24 @@ export function EditPurchaseOrderDialog({
           description: e?.message || "Failed to load purchase order",
           variant: "destructive",
         });
-        setLineItems([]);
+        const fallbackItems = (order?.lineItems ?? []).map((it) => ({
+          productId: it.productId,
+          productName:
+            it.product?.name ||
+            (it as { productName?: string }).productName ||
+            "Unknown product",
+          quantity: Number(it.quantity ?? 0),
+          unitCost: toNumber(it.unitCost),
+        }));
+
+        const expectedDate = toValidDate(order?.expectedDate) ?? new Date();
+        form.reset({
+          supplierId: order?.supplierId ?? "",
+          expectedDelivery: expectedDate,
+          notes: "",
+        });
+
+        setLineItems(fallbackItems);
       } finally {
         if (alive) {
           setLoading(false);
@@ -296,20 +321,16 @@ export function EditPurchaseOrderDialog({
     }
 
     try {
-      await http(`/procurement/purchase-orders/${order.id}`, {
-        method: "PATCH",
-        auth: true,
-        json: {
-          supplierId: values.supplierId,
-          expectedDate: values.expectedDelivery.toISOString(),
-          notes: values.notes,
-          items: lineItems.map((x) => ({
-            productId: x.productId,
-            quantity: x.quantity,
-            unitCost: x.unitCost,
-            taxRate: 0,
-          })),
-        },
+      await updatePurchaseOrder(order.id, {
+        supplierId: values.supplierId,
+        expectedDate: values.expectedDelivery.toISOString(),
+        notes: values.notes,
+        items: lineItems.map((x) => ({
+          productId: x.productId,
+          quantity: x.quantity,
+          unitCost: x.unitCost,
+          taxRate: 0,
+        })),
       });
 
       toast({

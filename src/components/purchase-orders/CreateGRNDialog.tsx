@@ -43,7 +43,12 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 // ✅ backend
-import { http } from "@/lib/http";
+import { listBranches } from "@/features/branches/branches.api";
+import type { Branch } from "@/features/branches/branches.types";
+import { getPurchaseOrder } from "@/features/procurement/purchase-orders/purchase-orders.api";
+import type { PurchaseOrder as ApiPurchaseOrder } from "@/features/procurement/purchase-orders/purchase-orders.types";
+import { createGrn } from "@/features/procurement/grns/grns.api";
+import type { CreateGrnDto } from "@/features/procurement/grns/grns.types";
 
 const formSchema = z.object({
   invoiceNumber: z.string().optional(),
@@ -58,30 +63,19 @@ interface PurchaseOrder {
   id: string;
   poNumber: string;
   supplier: string;
+  supplierId?: string;
+  branchId?: string;
   orderDate: string;
   expectedDate: string;
   items: number;
   totalValue: number;
   status: "draft" | "pending" | "approved" | "shipped" | "received" | "partial";
+  lineItems?: ApiPurchaseOrder["items"];
 }
 
-type ApiBranch = { id: string; name: string; isActive?: boolean };
+type ApiBranch = Branch;
 
-type ApiPurchaseOrderDetail = {
-  id: string;
-  poNumber?: string;
-  supplier?: { id: string; name: string } | null;
-  branchId?: string | null;
-  items?: Array<{
-    id: string;
-    productId: string;
-    quantity: number;
-    unitCost: number | string;
-    receivedQty?: number | string | null; // optional if backend provides
-    receivedQuantity?: number | string | null; // optional alt key
-    product?: { id: string; name: string; sku?: string | null } | null;
-  }>;
-};
+type ApiPurchaseOrderDetail = ApiPurchaseOrder;
 
 interface GRNLineItem {
   id: string; // PO item id
@@ -142,18 +136,7 @@ export function CreateGRNDialog({ open, onOpenChange, order }: CreateGRNDialogPr
         setLoading(true);
 
         // 1) Branches
-        // If your backend route is different, update here.
-        // Common options: /inventory/branches, /branches, /org/branches
-        let br: ApiBranch[] | null = null;
-        try {
-          br = await http<ApiBranch[]>("/branches", { method: "GET", auth: true });
-        } catch {
-          try {
-            br = await http<ApiBranch[]>("/inventory/branches", { method: "GET", auth: true });
-          } catch {
-            br = [];
-          }
-        }
+        const br = await listBranches();
         if (!alive) return;
         setBranches(Array.isArray(br) ? br : []);
 
@@ -163,25 +146,67 @@ export function CreateGRNDialog({ open, onOpenChange, order }: CreateGRNDialogPr
           form.setValue("branchId", savedBranchId);
         }
 
+        if (order?.lineItems && order.lineItems.length > 0) {
+          const items: GRNLineItem[] = order.lineItems.map((it) => {
+            const orderedQty = Number(it.quantity ?? 0);
+            const receivedQty = toNumber(it.receivedQty ?? 0);
+            const pendingQty = Math.max(0, orderedQty - receivedQty);
+            const unitCost = toNumber(it.unitCost);
+            const productName =
+              it.product?.name ?? (it as { productName?: string }).productName ?? "Unknown product";
+            const sku = it.product?.sku ?? (it as { sku?: string }).sku ?? "-";
+
+            return {
+              id: it.id,
+              productId: it.productId,
+              product: productName,
+              sku,
+              orderedQty,
+              receivedQty,
+              pendingQty,
+              receivingQty: pendingQty,
+              unitCost,
+            };
+          });
+
+          setLineItems(items);
+
+          if (!savedBranchId && order.branchId) {
+            form.setValue("branchId", order.branchId);
+            localStorage.setItem("erp.branchId", order.branchId);
+          }
+
+          return;
+        }
+
         // 2) PO detail (items)
-        const detail = await http<ApiPurchaseOrderDetail>(
-          `/procurement/purchase-orders/${order.id}`,
-          { method: "GET", auth: true },
-        );
+        let detail: ApiPurchaseOrderDetail | null = null;
+        try {
+          detail = await getPurchaseOrder(order.id);
+        } catch (e: any) {
+          toast({
+            title: "Error",
+            description: e?.message || "Failed to load purchase order details",
+            variant: "destructive",
+          });
+        }
         if (!alive) return;
 
-        const items: GRNLineItem[] = (detail?.items ?? []).map((it) => {
+        const sourceItems = detail?.items ?? order?.lineItems ?? [];
+        const items: GRNLineItem[] = sourceItems.map((it) => {
           const orderedQty = Number(it.quantity ?? 0);
-          const receivedQty =
-            toNumber(it.receivedQty ?? it.receivedQuantity ?? 0); // backend may not provide -> 0
+          const receivedQty = toNumber(it.receivedQty ?? 0); // backend may not provide -> 0
           const pendingQty = Math.max(0, orderedQty - receivedQty);
           const unitCost = toNumber(it.unitCost);
+          const productName =
+            it.product?.name ?? (it as { productName?: string }).productName ?? "Unknown product";
+          const sku = it.product?.sku ?? (it as { sku?: string }).sku ?? "-";
 
           return {
             id: it.id,
             productId: it.productId,
-            product: it.product?.name ?? "Unknown product",
-            sku: it.product?.sku ?? "-",
+            product: productName,
+            sku,
             orderedQty,
             receivedQty,
             pendingQty,
@@ -196,6 +221,7 @@ export function CreateGRNDialog({ open, onOpenChange, order }: CreateGRNDialogPr
         const poBranchId = detail?.branchId ?? "";
         if (!savedBranchId && poBranchId) {
           form.setValue("branchId", poBranchId);
+          localStorage.setItem("erp.branchId", poBranchId);
         }
       } catch (e: any) {
         toast({
@@ -204,7 +230,6 @@ export function CreateGRNDialog({ open, onOpenChange, order }: CreateGRNDialogPr
           variant: "destructive",
         });
         setLineItems([]);
-        setBranches([]);
       } finally {
         if (alive) setLoading(false);
       }
@@ -235,13 +260,7 @@ export function CreateGRNDialog({ open, onOpenChange, order }: CreateGRNDialogPr
   const onSubmit = async (values: FormValues) => {
     if (!order?.id) return;
 
-    const itemsToReceive = lineItems
-      .filter((item) => item.receivingQty > 0)
-      .map((item) => ({
-        productId: item.productId,
-        quantity: item.receivingQty,
-        unitCost: item.unitCost,
-      }));
+    const itemsToReceive = lineItems.filter((item) => item.receivingQty > 0);
 
     if (itemsToReceive.length === 0) {
       toast({
@@ -253,18 +272,23 @@ export function CreateGRNDialog({ open, onOpenChange, order }: CreateGRNDialogPr
     }
 
     try {
-      await http("/procurement/grns", {
-        method: "POST",
-        auth: true,
-        json: {
-          purchaseOrderId: order.id,
-          branchId: values.branchId,
-          supplierInvoiceNo: values.invoiceNumber || null,
-          supplierInvoiceDate: values.invoiceDate ? values.invoiceDate.toISOString() : null,
-          notes: values.notes,
-          items: itemsToReceive,
-        },
-      });
+      const payload: CreateGrnDto = {
+        poId: order.id,
+        purchaseOrderId: order.id,
+        branchId: values.branchId || undefined,
+        invoiceNumber: values.invoiceNumber || undefined,
+        supplierInvoiceNo: values.invoiceNumber || undefined,
+        invoiceDate: values.invoiceDate ? values.invoiceDate.toISOString() : undefined,
+        supplierInvoiceDate: values.invoiceDate ? values.invoiceDate.toISOString() : undefined,
+        notes: values.notes || undefined,
+        items: itemsToReceive.map((item) => ({
+          productId: item.productId,
+          quantity: item.receivingQty,
+          unitCost: item.unitCost,
+        })),
+      };
+
+      await createGrn(payload);
 
       toast({
         title: "GRN Created",
@@ -322,7 +346,13 @@ export function CreateGRNDialog({ open, onOpenChange, order }: CreateGRNDialogPr
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Receiving Branch</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        localStorage.setItem("erp.branchId", value);
+                      }}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder={loading ? "Loading..." : "Select branch"} />
