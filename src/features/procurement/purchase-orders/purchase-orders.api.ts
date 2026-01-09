@@ -44,11 +44,37 @@ export function listPurchaseOrders(query: PurchaseOrdersQuery = {}) {
 /**
  * GET /procurement/purchase-orders/:id
  */
-export function getPurchaseOrder(id: UUID) {
-  return api<PurchaseOrder>(`/procurement/purchase-orders/${id}`, {
+type PurchaseOrderDetailResponse =
+  | PurchaseOrder
+  | { data?: PurchaseOrder }
+  | { item?: PurchaseOrder }
+  | { purchaseOrder?: PurchaseOrder };
+
+export async function getPurchaseOrder(id: UUID) {
+  const res = await api<PurchaseOrderDetailResponse>(`/procurement/purchase-orders/${id}`, {
     method: "GET",
     auth: true,
   });
+
+  const detail =
+    (res as { data?: PurchaseOrder }).data ??
+    (res as { item?: PurchaseOrder }).item ??
+    (res as { purchaseOrder?: PurchaseOrder }).purchaseOrder ??
+    (res as PurchaseOrder);
+
+  const rawItems =
+    (detail as any)?.items ??
+    (detail as any)?.purchaseOrderItems ??
+    (detail as any)?.poItems ??
+    (detail as any)?.lineItems ??
+    (detail as any)?.lines ??
+    [];
+
+  if (detail && !(detail as any).items && Array.isArray(rawItems)) {
+    return { ...(detail as PurchaseOrder), items: rawItems };
+  }
+
+  return detail as PurchaseOrder;
 }
 
 /**

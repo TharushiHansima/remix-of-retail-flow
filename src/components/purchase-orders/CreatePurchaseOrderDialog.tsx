@@ -46,9 +46,11 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
 // ✅ backend helpers
-import { http } from "@/lib/http";
 import { listProducts } from "@/features/inventory/products/products.api";
 import type { Product as ApiProduct } from "@/features/inventory/products/products.types";
+import { createPurchaseOrder } from "@/features/procurement/purchase-orders/purchase-orders.api";
+import { listSuppliers } from "@/features/procurement/suppliers/suppliers.api";
+import type { Supplier } from "@/features/procurement/suppliers/suppliers.types";
 
 const formSchema = z.object({
   supplierId: z.string().min(1, "Supplier is required"),
@@ -57,12 +59,6 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
-
-type ApiSupplier = {
-  id: string;
-  name: string;
-  isActive?: boolean;
-};
 
 interface LineItem {
   productId: string;
@@ -99,7 +95,7 @@ export function CreatePurchaseOrderDialog({
 }: CreatePurchaseOrderDialogProps) {
   const { toast } = useToast();
 
-  const [suppliers, setSuppliers] = useState<ApiSupplier[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [suppliersLoading, setSuppliersLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(false);
@@ -124,7 +120,7 @@ export function CreatePurchaseOrderDialog({
     void (async () => {
       try {
         setSuppliersLoading(true);
-        const s = await http<ApiSupplier[]>("/procurement/suppliers", { method: "GET", auth: true });
+        const s = await listSuppliers();
         if (!alive) return;
         setSuppliers(Array.isArray(s) ? s.filter(x => x.isActive !== false) : []);
       } catch (e: any) {
@@ -238,21 +234,17 @@ export function CreatePurchaseOrderDialog({
     }
 
     try {
-      await http("/procurement/purchase-orders", {
-        method: "POST",
-        auth: true,
-        json: {
-          supplierId: values.supplierId,
-          branchId,
-          expectedDate: values.expectedDelivery.toISOString(),
-          notes: values.notes,
-          items: lineItems.map((x) => ({
-            productId: x.productId,
-            quantity: x.quantity,
-            unitCost: x.unitCost,
-            taxRate: 0,
-          })),
-        },
+      await createPurchaseOrder({
+        supplierId: values.supplierId,
+        branchId,
+        expectedDate: values.expectedDelivery.toISOString(),
+        notes: values.notes,
+        items: lineItems.map((x) => ({
+          productId: x.productId,
+          quantity: x.quantity,
+          unitCost: x.unitCost,
+          taxRate: 0,
+        })),
       });
 
       const supplier = suppliers.find((s) => s.id === values.supplierId);
@@ -264,6 +256,7 @@ export function CreatePurchaseOrderDialog({
 
       form.reset();
       setLineItems([]);
+      window.dispatchEvent(new Event("purchase-orders:changed"));
       onOpenChange(false);
     } catch (e: any) {
       toast({
