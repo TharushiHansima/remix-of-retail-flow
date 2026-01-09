@@ -12,7 +12,9 @@ import {
   FileText,
   AlertTriangle,
   Calculator,
+  Layers,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +55,7 @@ import { LandedCostAllocationDialog } from "@/components/grn/LandedCostAllocatio
 
 // ✅ API
 import { listGrns, getGrn, setGrnVerification } from "@/features/procurement/grns/grns.api";
+import { createFifoLayersFromGrn } from "@/features/inventory/valuation/valuation.api";
 import type { GrnApi } from "@/features/procurement/grns/grns.types";
 
 interface GRNItem {
@@ -227,13 +230,21 @@ export default function GRN() {
   }
 
   async function verifyGrn(grnId: string) {
-    // ⚠️ if your backend expects different fields, share UpdateGrnVerificationDto and I’ll match it
-    await setGrnVerification(grnId, { status: "verified" });
-    await loadGrns({ search: searchQuery, status: statusFilter });
-
-    if (selectedGRN?.id === grnId) {
-      const full = await getGrn(grnId);
-      setSelectedGRN(mapGrn(full));
+    try {
+      await setGrnVerification(grnId, { status: "verified" });
+      try {
+        await createFifoLayersFromGrn(grnId);
+        toast.success("GRN verified and FIFO cost layers created");
+      } catch {
+        toast.success("GRN verified");
+      }
+      await loadGrns({ search: searchQuery, status: statusFilter });
+      if (selectedGRN?.id === grnId) {
+        const full = await getGrn(grnId);
+        setSelectedGRN(mapGrn(full));
+      }
+    } catch (error: any) {
+      toast.error("Failed to verify GRN");
     }
   }
 
