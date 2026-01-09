@@ -34,6 +34,7 @@ interface Product {
   price: number;
   wholesalePrice?: number;
   cost: number;
+  unitWeight?: number;
   stock: {
     main: number;
     downtown: number;
@@ -74,6 +75,7 @@ export function EditProductDialog({
     unitPrice: "",
     wholesalePrice: "",
     costPrice: "",
+    unitWeight: "",
     minStockLevel: "",
     maxStockLevel: "",
     reorderQuantity: "",
@@ -94,6 +96,7 @@ export function EditProductDialog({
       unitPrice: product.price.toString(),
       wholesalePrice: product.wholesalePrice?.toString() || "0",
       costPrice: product.cost.toString(),
+      unitWeight: product.unitWeight?.toString() || "0",
       minStockLevel: "0",
       maxStockLevel: "100",
       reorderQuantity: "10",
@@ -126,6 +129,9 @@ export function EditProductDialog({
 
     const costPrice = toOptionalNumber(formData.costPrice);
     if (costPrice !== undefined) dto.costPrice = costPrice;
+
+    const unitWeight = toOptionalNumber(formData.unitWeight);
+    if (unitWeight !== undefined) dto.unitWeight = unitWeight;
 
     const wholesalePrice = toOptionalNumber(formData.wholesalePrice);
     if (wholesalePrice !== undefined) dto.wholesalePrice = wholesalePrice;
@@ -282,6 +288,20 @@ dto.isActive = formData.isActive;
                   placeholder="0.00"
                   required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="unitWeight">Unit Weight (kg)</Label>
+                <Input
+                  id="unitWeight"
+                  type="number"
+                  step="0.001"
+                  value={formData.unitWeight}
+                  onChange={(e) => setFormData({ ...formData, unitWeight: e.target.value })}
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Used for weight-based landed cost allocation
+                </p>
               </div>
             </div>
           </div>
