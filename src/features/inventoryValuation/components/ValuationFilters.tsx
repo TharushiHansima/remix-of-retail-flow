@@ -1,6 +1,7 @@
-import { Search, RotateCcw, Filter } from "lucide-react";
+import { Search, RotateCcw, Filter, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -53,6 +54,8 @@ export function ValuationFilters({
   ) => {
     onFiltersChange({ ...filters, [key]: value });
   };
+
+  const today = new Date().toISOString().split("T")[0];
 
   return (
     <div className="space-y-4">
@@ -163,13 +166,30 @@ export function ValuationFilters({
           </SelectContent>
         </Select>
 
-        <Input
-          type="date"
-          value={filters.asOfDate || ""}
-          onChange={(e) => updateFilter("asOfDate", e.target.value || undefined)}
-          className="w-[160px]"
-          placeholder="As of date"
-        />
+        {/* As Of Date - Point-in-time reporting */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              type="date"
+              value={filters.asOfDate || ""}
+              onChange={(e) => updateFilter("asOfDate", e.target.value || undefined)}
+              max={today}
+              className="w-[170px] pl-9"
+              title="As of date - View historical snapshot"
+            />
+          </div>
+          {filters.asOfDate && filters.asOfDate < today && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={() => updateFilter("asOfDate", undefined)}
+            >
+              Clear date
+            </Button>
+          )}
+        </div>
 
         <div className="flex-1 min-w-[200px]">
           <div className="relative">
