@@ -46,8 +46,10 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+
+// ✅ use your backend api helper
+import { api } from "@/lib/api";
 
 const formSchema = z.object({
   supplierId: z.string().min(1, "Supplier is required"),
@@ -82,6 +84,25 @@ interface CreateGRNDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+// --- Helpers to handle both array and {data: []} backend responses ---
+function unwrapList<T>(res: any): T[] {
+  if (Array.isArray(res)) return res;
+  if (res && Array.isArray(res.data)) return res.data;
+  return [];
+}
+
+function unwrapId(res: any): string | null {
+  if (!res) return null;
+  if (typeof res.id === "string") return res.id;
+  if (res.data && typeof res.data.id === "string") return res.data.id;
+  return null;
+}
+
+function toISODate(d?: Date) {
+  // backend usually accepts ISO string; safest
+  return d ? d.toISOString() : undefined;
+}
+
 export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
   const { toast } = useToast();
   const [lineItems, setLineItems] = useState<GRNLineItem[]>([]);
@@ -92,46 +113,55 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
   const [costType, setCostType] = useState("");
   const [costDescription, setCostDescription] = useState("");
   const [costAmount, setCostAmount] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Fetch suppliers
+  // ✅ Fetch suppliers from backend
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("suppliers")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data;
+      // change endpoint if yours differs
+      const res = await api<any>("/procurement/suppliers", { method: "GET", auth: true });
+      const list = unwrapList<any>(res);
+
+      // normalize shape: {id,name}
+      return list
+        .filter((s) => s?.isActive !== false) // keep if backend has isActive
+        .map((s) => ({ id: s.id, name: s.name }));
     },
   });
 
-  // Fetch branches
+  // ✅ Fetch branches from backend
   const { data: branches = [] } = useQuery({
     queryKey: ["branches"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("branches")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data;
+      // change endpoint if yours differs
+      const res = await api<any>("/inventory/branches", { method: "GET", auth: true });
+      const list = unwrapList<any>(res);
+
+      return list
+        .filter((b) => b?.isActive !== false)
+        .map((b) => ({ id: b.id, name: b.name }));
     },
   });
 
-  // Fetch products
+  // ✅ Fetch products from backend
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("id, name, sku, cost_price")
-        .eq("is_active", true)
-        .order("name");
-      if (error) throw error;
-      return data;
+      // change endpoint if yours differs
+      const res = await api<any>("/inventory/products", { method: "GET", auth: true });
+      const list = unwrapList<any>(res);
+
+      // normalize: id, name, sku, cost_price/costPrice
+      return list
+        .filter((p) => p?.isActive !== false)
+        .map((p) => ({
+          id: p.id,
+          name: p.name,
+          sku: p.sku ?? p.code ?? "",
+          cost_price: p.costPrice ?? p.cost_price ?? p.cost ?? 0,
+        }))
+        .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
     },
   });
 
@@ -149,9 +179,7 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
   useEffect(() => {
     if (selectedProduct) {
       const product = products.find((p) => p.id === selectedProduct);
-      if (product) {
-        setUnitCost(product.cost_price);
-      }
+      if (product) setUnitCost(Number(product.cost_price) || 0);
     }
   }, [selectedProduct, products]);
 
@@ -193,12 +221,12 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
     setLineItems(lineItems.filter((item) => item.id !== id));
   };
 
-  const updateLineItem = (id: string, field: keyof GRNLineItem, value: number | string | Date) => {
-    setLineItems(
-      lineItems.map((item) =>
-        item.id === id ? { ...item, [field]: value } : item
-      )
-    );
+  const updateLineItem = (
+    id: string,
+    field: keyof GRNLineItem,
+    value: number | string | Date
+  ) => {
+    setLineItems(lineItems.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
   };
 
   const addLandedCost = () => {
@@ -223,11 +251,7 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
     setLandedCosts(landedCosts.filter((cost) => cost.id !== id));
   };
 
-  const subtotal = lineItems.reduce(
-    (sum, item) => sum + item.quantity * item.unitCost,
-    0
-  );
-
+  const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.unitCost, 0);
   const totalLandedCost = landedCosts.reduce((sum, cost) => sum + cost.amount, 0);
   const totalAmount = subtotal + totalLandedCost;
 
@@ -241,76 +265,74 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
       return;
     }
 
+    setSubmitting(true);
     try {
-      // Generate GRN number
-      const grnNumber = `GRN-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+      // ✅ Create GRN in backend
+      // IMPORTANT: If your backend CreateGrnDto REQUIRES poId, this will 400/500.
+      // If that happens, tell me your backend CreateGrnDto and I'll map exactly.
+      const payload: any = {
+        supplierId: values.supplierId,
+        branchId: values.branchId,
+        invoiceNumber: values.invoiceNumber || undefined,
+        invoiceDate: values.invoiceDate ? toISODate(values.invoiceDate) : undefined,
+        notes: values.notes || undefined,
+        items: lineItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          unitCost: item.unitCost,
+          batchNumber: item.batchNumber || undefined,
+          expiryDate: item.expiryDate ? toISODate(item.expiryDate) : undefined,
+        })),
+      };
 
-      // Create GRN
-      const { data: grn, error: grnError } = await supabase
-        .from("grn")
-        .insert({
-          grn_number: grnNumber,
-          supplier_id: values.supplierId,
-          branch_id: values.branchId,
-          invoice_number: values.invoiceNumber || null,
-          invoice_date: values.invoiceDate ? format(values.invoiceDate, "yyyy-MM-dd") : null,
-          notes: values.notes || null,
-          subtotal,
-          landed_cost: totalLandedCost,
-          total_amount: totalAmount,
-          status: "pending",
-        })
-        .select()
-        .single();
+      const created = await api<any>("/procurement/grns", {
+        method: "POST",
+        auth: true,
+        json: payload,
+      });
 
-      if (grnError) throw grnError;
+      const grnId = unwrapId(created);
+      if (!grnId) {
+        throw new Error("GRN created but no id returned from backend");
+      }
 
-      // Insert GRN items
-      const grnItems = lineItems.map((item) => ({
-        grn_id: grn.id,
-        product_id: item.productId,
-        ordered_quantity: item.quantity,
-        received_quantity: item.quantity,
-        unit_cost: item.unitCost,
-        batch_number: item.batchNumber || null,
-        expiry_date: item.expiryDate ? format(item.expiryDate, "yyyy-MM-dd") : null,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("grn_items")
-        .insert(grnItems);
-
-      if (itemsError) throw itemsError;
-
-      // Insert landed costs if any
+      // ✅ Add landed costs (your backend uses POST /:id/landed-costs)
       if (landedCosts.length > 0) {
-        const costs = landedCosts.map((cost) => ({
-          grn_id: grn.id,
-          cost_type: cost.type,
-          description: cost.description || null,
-          amount: cost.amount,
-        }));
-
-        const { error: costsError } = await supabase
-          .from("grn_landed_costs")
-          .insert(costs);
-
-        if (costsError) throw costsError;
+        for (const cost of landedCosts) {
+          await api<any>(`/procurement/grns/${grnId}/landed-costs`, {
+            method: "POST",
+            auth: true,
+            json: {
+              type: cost.type,
+              description: cost.description || undefined,
+              amount: cost.amount,
+            },
+          });
+        }
       }
 
       toast({
         title: "GRN Created",
-        description: `${grnNumber} has been created successfully`,
+        description: "GRN has been created successfully",
       });
 
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating GRN:", error);
+
+      const msg =
+        error?.message ||
+        error?.error ||
+        (typeof error === "string" ? error : null) ||
+        "Failed to create GRN. Please try again.";
+
       toast({
         title: "Error",
-        description: "Failed to create GRN. Please try again.",
+        description: msg,
         variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -321,11 +343,21 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
     setSelectedProduct("");
     setQuantity(1);
     setUnitCost(0);
+    setCostType("");
+    setCostDescription("");
+    setCostAmount(0);
     onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        // keep behavior: close resets
+        if (!nextOpen) handleClose();
+        else onOpenChange(true);
+      }}
+    >
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -358,7 +390,7 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {suppliers.map((supplier) => (
+                        {suppliers.map((supplier: any) => (
                           <SelectItem key={supplier.id} value={supplier.id}>
                             {supplier.name}
                           </SelectItem>
@@ -383,7 +415,7 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {branches.map((branch) => (
+                        {branches.map((branch: any) => (
                           <SelectItem key={branch.id} value={branch.id}>
                             {branch.name}
                           </SelectItem>
@@ -425,11 +457,7 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
                               !field.value && "text-muted-foreground"
                             )}
                           >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
@@ -460,13 +488,14 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
                     <SelectValue placeholder="Select product" />
                   </SelectTrigger>
                   <SelectContent>
-                    {products.map((product) => (
+                    {products.map((product: any) => (
                       <SelectItem key={product.id} value={product.id}>
                         {product.name} ({product.sku})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+
                 <Input
                   type="number"
                   min={1}
@@ -475,6 +504,7 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
                   className="w-20"
                   placeholder="Qty"
                 />
+
                 <Input
                   type="number"
                   min={0}
@@ -484,6 +514,7 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
                   className="w-28"
                   placeholder="Unit Cost"
                 />
+
                 <Button type="button" onClick={addLineItem} variant="secondary">
                   <Plus className="h-4 w-4 mr-1" />
                   Add
@@ -518,14 +549,16 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
                             min={1}
                             value={item.quantity}
                             onChange={(e) =>
-                              updateLineItem(item.id, "quantity", parseInt(e.target.value) || 1)
+                              updateLineItem(
+                                item.id,
+                                "quantity",
+                                parseInt(e.target.value) || 1
+                              )
                             }
                             className="w-20 text-center mx-auto"
                           />
                         </TableCell>
-                        <TableCell className="text-right">
-                          ${item.unitCost.toFixed(2)}
-                        </TableCell>
+                        <TableCell className="text-right">${item.unitCost.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-medium">
                           ${(item.quantity * item.unitCost).toFixed(2)}
                         </TableCell>
@@ -565,12 +598,14 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
+
                 <Input
                   value={costDescription}
                   onChange={(e) => setCostDescription(e.target.value)}
                   className="flex-1"
                   placeholder="Description"
                 />
+
                 <Input
                   type="number"
                   min={0}
@@ -580,6 +615,7 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
                   className="w-28"
                   placeholder="Amount"
                 />
+
                 <Button type="button" onClick={addLandedCost} variant="secondary">
                   <Plus className="h-4 w-4 mr-1" />
                   Add
@@ -670,12 +706,12 @@ export function CreateGRNDialog({ open, onOpenChange }: CreateGRNDialogProps) {
 
             {/* Actions */}
             <div className="flex justify-end gap-3">
-              <Button type="button" variant="outline" onClick={handleClose}>
+              <Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" disabled={submitting}>
                 <Package className="h-4 w-4 mr-2" />
-                Create GRN
+                {submitting ? "Creating..." : "Create GRN"}
               </Button>
             </div>
           </form>

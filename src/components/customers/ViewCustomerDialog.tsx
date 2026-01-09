@@ -1,4 +1,12 @@
-import { User, Mail, Phone, MapPin, CreditCard, Receipt, Calendar } from "lucide-react";
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  CreditCard,
+  Receipt,
+  Calendar,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -9,19 +17,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-interface Customer {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
-  type: "individual" | "business";
-  creditLimit: number;
-  balance: number;
-  totalPurchases: number;
-  lastVisit: string;
-  status: "active" | "inactive";
-}
+import type { Customer } from "@/features/customers/customers.types";
 
 interface ViewCustomerDialogProps {
   open: boolean;
@@ -36,6 +32,8 @@ export function ViewCustomerDialog({
 }: ViewCustomerDialogProps) {
   if (!customer) return null;
 
+  const status = customer.isActive ? "active" : "inactive";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
@@ -48,7 +46,7 @@ export function ViewCustomerDialog({
           <div className="flex items-center gap-4">
             <Avatar className="h-16 w-16">
               <AvatarFallback className="bg-primary/10 text-primary text-xl">
-                {customer.name
+                {(customer.name || "NA")
                   .split(" ")
                   .map((n) => n[0])
                   .join("")
@@ -63,12 +61,12 @@ export function ViewCustomerDialog({
                 </Badge>
                 <Badge
                   className={
-                    customer.status === "active"
+                    status === "active"
                       ? "bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]"
                       : "bg-muted text-muted-foreground"
                   }
                 >
-                  {customer.status === "active" ? "Active" : "Inactive"}
+                  {status === "active" ? "Active" : "Inactive"}
                 </Badge>
               </div>
             </div>
@@ -78,7 +76,9 @@ export function ViewCustomerDialog({
 
           {/* Contact Info */}
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-muted-foreground">Contact Information</h4>
+            <h4 className="text-sm font-medium text-muted-foreground">
+              Contact Information
+            </h4>
             <div className="grid gap-3">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-muted">
@@ -114,7 +114,9 @@ export function ViewCustomerDialog({
 
           {/* Financial Info */}
           <div className="space-y-3">
-            <h4 className="text-sm font-medium text-muted-foreground">Financial Summary</h4>
+            <h4 className="text-sm font-medium text-muted-foreground">
+              Financial Summary
+            </h4>
             <div className="grid grid-cols-2 gap-4">
               <div className="p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2 mb-1">
@@ -122,9 +124,10 @@ export function ViewCustomerDialog({
                   <span className="text-sm text-muted-foreground">Credit Limit</span>
                 </div>
                 <p className="text-lg font-semibold">
-                  ${customer.creditLimit.toLocaleString()}
+                  ${Number(customer.creditLimit || 0).toLocaleString()}
                 </p>
               </div>
+
               <div className="p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2 mb-1">
                   <Receipt className="h-4 w-4 text-muted-foreground" />
@@ -132,29 +135,31 @@ export function ViewCustomerDialog({
                 </div>
                 <p
                   className={`text-lg font-semibold ${
-                    customer.balance > 0
+                    Number(customer.balance || 0) > 0
                       ? "text-[hsl(var(--warning))]"
                       : "text-[hsl(var(--success))]"
                   }`}
                 >
-                  ${customer.balance.toLocaleString()}
+                  ${Number(customer.balance || 0).toLocaleString()}
                 </p>
               </div>
+
               <div className="p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2 mb-1">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">Total Purchases</span>
                 </div>
                 <p className="text-lg font-semibold text-[hsl(var(--success))]">
-                  ${customer.totalPurchases.toLocaleString()}
+                  ${Number(customer.totalPurchases || 0).toLocaleString()}
                 </p>
               </div>
+
               <div className="p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-2 mb-1">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm text-muted-foreground">Last Visit</span>
                 </div>
-                <p className="text-lg font-semibold">{customer.lastVisit}</p>
+                <p className="text-lg font-semibold">{customer.lastVisit || "-"}</p>
               </div>
             </div>
           </div>
