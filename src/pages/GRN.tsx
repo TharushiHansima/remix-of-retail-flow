@@ -46,7 +46,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
-import { CreateGRNDialog } from "@/components/grn/CreateGRNDialog";
+// CreateGRNDialog removed - GRN creation should come from PO flow
 
 interface GRNItem {
   id: string;
@@ -262,7 +262,7 @@ export default function GRN() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGRN, setSelectedGRN] = useState<GRN | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  // GRN creation removed - GRN should be created from PO flow
 
   const filteredGRNs = grns.filter((grn) => {
     const matchesSearch =
@@ -284,22 +284,13 @@ export default function GRN() {
           <h1 className="text-2xl font-bold text-foreground">Goods Received Notes</h1>
           <p className="text-muted-foreground">Manage goods receipts and landed costs</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            New GRN
-          </Button>
-        </div>
+        <Button variant="outline" size="sm">
+          <Download className="h-4 w-4 mr-2" />
+          Export
+        </Button>
       </div>
 
-      <CreateGRNDialog
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-      />
+      {/* GRN creation dialog removed - GRNs are created from PO flow */}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

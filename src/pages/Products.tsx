@@ -447,19 +447,28 @@ export default function Products() {
         </Button>
       </div>
 
-      {/* Bulk Actions */}
+      {/* Selected Product Actions */}
       {selectedProducts.length > 0 && (
         <div className="flex items-center gap-3 p-3 bg-accent rounded-lg">
           <span className="text-sm font-medium">
             {selectedProducts.length} selected
           </span>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => {
+            // Bulk update status - toggle active/inactive for selected
+            toast.info("Bulk status update coming soon");
+          }}>
             Update Status
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => {
+            // Bulk update category
+            toast.info("Bulk category update coming soon");
+          }}>
             Update Category
           </Button>
-          <Button variant="outline" size="sm" className="text-destructive">
+          <Button variant="outline" size="sm" className="text-destructive" onClick={() => {
+            // Bulk delete
+            toast.info("Bulk delete coming soon");
+          }}>
             Delete
           </Button>
         </div>
@@ -547,6 +556,16 @@ export default function Products() {
                         <DropdownMenuItem onClick={() => handleEdit(product)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Product
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          onClick={async () => {
+                            const newStatus = product.status === 'active' ? 'inactive' : 'active';
+                            const ok = await handleUpdateProduct(product.id, { isActive: newStatus === 'active' });
+                            if (ok) toast.success(`Product ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
+                          }}
+                        >
+                          <Package className="mr-2 h-4 w-4" />
+                          {product.status === 'active' ? 'Deactivate' : 'Activate'}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive"
