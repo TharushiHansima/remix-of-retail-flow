@@ -285,54 +285,131 @@ export default function Customers() {
             </TableRow>
           </TableHeader>
 
-          <TableBody>
-            {filteredCustomers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="h-48">
-                  <EmptyState
-                    variant={searchQuery ? "no-results" : "no-data"}
-                    title={searchQuery ? "No customers match your search" : "No customers yet"}
-                    description={searchQuery ? "Try different search terms" : "Get started by adding your first customer"}
-                    action={!searchQuery ? { label: "Add Customer", onClick: () => setIsAddDialogOpen(true) } : undefined}
-                  />
-                </TableCell>
-              </TableRow>
-            ) : (
-            filteredCustomers.map((customer) => (
-              <TableRow key={customer.id} className="hover:bg-muted/30">
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback className="bg-primary/10 text-primary">
-                        {customer.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")
-                          .slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-card-foreground">{customer.name}</p>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3" />
-                        <span className="truncate max-w-48">{customer.address}</span>
-                      </div>
-                    </div>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : filteredCustomers.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="py-10 text-center text-muted-foreground"
-                >
-                  No customers found
-                </TableCell>
-              </TableRow>
-            ))
-            )}
-          </TableBody>
+         <TableBody>
+  {filteredCustomers.length === 0 ? (
+    <TableRow>
+      <TableCell colSpan={8} className="h-48">
+        <EmptyState
+          variant={searchQuery ? "no-results" : "no-data"}
+          title={
+            searchQuery
+              ? "No customers match your search"
+              : "No customers yet"
+          }
+          description={
+            searchQuery
+              ? "Try different search terms"
+              : "Get started by adding your first customer"
+          }
+          action={
+            !searchQuery
+              ? { label: "Add Customer", onClick: () => setIsAddDialogOpen(true) }
+              : undefined
+          }
+        />
+      </TableCell>
+    </TableRow>
+  ) : (
+    filteredCustomers.map((customer) => (
+      <TableRow key={customer.id} className="hover:bg-muted/30">
+        {/* Customer */}
+        <TableCell>
+          <div className="flex items-center gap-3">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback className="bg-primary/10 text-primary">
+                {(customer.name || "C")
+                  .split(" ")
+                  .filter(Boolean)
+                  .map((n) => n[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-medium text-card-foreground">
+                {customer.name}
+              </p>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                <span className="truncate max-w-48">
+                  {customer.address || "—"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </TableCell>
+
+        {/* Contact */}
+        <TableCell>
+          <div className="space-y-1 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Phone className="h-3.5 w-3.5" />
+              <span>{customer.phone || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Mail className="h-3.5 w-3.5" />
+              <span className="truncate max-w-56">{customer.email || "—"}</span>
+            </div>
+          </div>
+        </TableCell>
+
+        {/* Type */}
+        <TableCell>
+          <Badge variant="secondary">
+            {customer.type === "business" ? "Business" : "Individual"}
+          </Badge>
+        </TableCell>
+
+        {/* Credit Limit */}
+        <TableCell className="text-right">
+          {Number(customer.creditLimit || 0).toLocaleString()}
+        </TableCell>
+
+        {/* Balance */}
+        <TableCell className="text-right">
+          {Number(customer.balance || 0).toLocaleString()}
+        </TableCell>
+
+        {/* Total Purchases */}
+        <TableCell className="text-right">
+          {Number(customer.totalPurchases || 0).toLocaleString()}
+        </TableCell>
+
+        {/* Last Visit */}
+        <TableCell>{customer.lastVisit || "—"}</TableCell>
+
+        {/* Actions */}
+        <TableCell className="text-right">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleViewProfile(customer)}>
+                <Eye className="h-4 w-4 mr-2" />
+                View
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => handleEditCustomer(customer)}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onClick={() => handleViewInvoices(customer)}>
+                <FileText className="h-4 w-4 mr-2" />
+                Invoices
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TableCell>
+      </TableRow>
+    ))
+  )}
+</TableBody>
+
         </Table>
       </div>
 
