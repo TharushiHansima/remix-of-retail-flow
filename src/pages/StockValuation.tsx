@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react";
-import { RefreshCw, Download } from "lucide-react";
+import { RefreshCw, Download, Clock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   ValuationFilters as ValuationFiltersComponent,
   ValuationSummaryCards,
@@ -18,6 +19,7 @@ import {
 } from "@/features/inventoryValuation/hooks";
 import { generateValuationCSV } from "@/features/inventoryValuation/api";
 import type { ValuationFilters } from "@/features/inventoryValuation/types";
+import { format } from "date-fns";
 
 const defaultFilters: ValuationFilters = {
   agingBucket: "ALL",
@@ -40,6 +42,9 @@ export default function StockValuation() {
   const { data: categories = [] } = useCategories();
   const { data: suppliers = [] } = useSuppliers();
 
+  const isHistorical = data?.summary?.isHistorical;
+  const snapshotDate = data?.summary?.snapshotDate;
+
   const handleApplyFilters = useCallback(() => {
     setAppliedFilters(filters);
   }, [filters]);
@@ -59,19 +64,38 @@ export default function StockValuation() {
     const csv = generateValuationCSV(data.rows);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const link = document.createElement("a");
+    const dateStr = snapshotDate || new Date().toISOString().split("T")[0];
     link.href = URL.createObjectURL(blob);
-    link.download = `inventory-valuation-${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `inventory-valuation-${dateStr}.csv`;
     link.click();
-  }, [data?.rows]);
+  }, [data?.rows, snapshotDate]);
+
+  const formatDisplayDate = (dateStr: string) => {
+    try {
+      return format(new Date(dateStr), "MMMM d, yyyy");
+    } catch {
+      return dateStr;
+    }
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Stock Valuation</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight">Stock Valuation</h1>
+            {isHistorical && snapshotDate && (
+              <Badge variant="secondary" className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                Historical Snapshot
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
-            Inventory value and costing breakdown (FIFO / Moving Avg)
+            {isHistorical && snapshotDate
+              ? `Point-in-time valuation as of ${formatDisplayDate(snapshotDate)}`
+              : "Inventory value and costing breakdown (FIFO / Moving Avg)"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -89,6 +113,25 @@ export default function StockValuation() {
           </Button>
         </div>
       </div>
+
+      {/* Historical data notice */}
+      {isHistorical && snapshotDate && (
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            You are viewing a <strong>historical snapshot</strong> of inventory valuation as of{" "}
+            <strong>{formatDisplayDate(snapshotDate)}</strong>. This data reflects the stock levels and 
+            values at that point in time.{" "}
+            <Button 
+              variant="link" 
+              className="p-0 h-auto font-medium" 
+              onClick={handleResetFilters}
+            >
+              View current data
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Filters */}
       <ValuationFiltersComponent

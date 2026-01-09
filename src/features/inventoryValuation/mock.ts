@@ -13,6 +13,12 @@ import type {
   AgingBucket,
 } from "./types";
 
+// Historical snapshot data structure
+export interface HistoricalSnapshot {
+  snapshotDate: string;
+  rows: ValuationRow[];
+}
+
 // Reference data
 export const mockBranches: Branch[] = [
   { id: "br-1", name: "Main Store" },
@@ -535,16 +541,104 @@ export const mockValuationRows: ValuationRow[] = [
   },
 ];
 
+// Historical snapshots - showing how values changed over time
+export const mockHistoricalSnapshots: HistoricalSnapshot[] = [
+  {
+    snapshotDate: "2024-11-01",
+    rows: mockValuationRows.map((row) => ({
+      ...row,
+      id: `hist-${row.id}-nov`,
+      onHandQty: Math.round(row.onHandQty * 0.7), // 70% of current stock
+      stockValue: Math.round(row.stockValue * 0.65), // Lower value due to fewer items
+      unitCost: Math.round(row.unitCost * 0.95), // Slightly lower costs
+      agingBucket: row.agingBucket === "0-30" ? "0-30" : row.agingBucket === "31-60" ? "0-30" : row.agingBucket as AgingBucket,
+    })),
+  },
+  {
+    snapshotDate: "2024-10-01",
+    rows: mockValuationRows.map((row) => ({
+      ...row,
+      id: `hist-${row.id}-oct`,
+      onHandQty: Math.round(row.onHandQty * 0.5), // 50% of current stock
+      stockValue: Math.round(row.stockValue * 0.45), // Lower value
+      unitCost: Math.round(row.unitCost * 0.9), // Lower costs
+      agingBucket: "0-30" as AgingBucket, // All newer at that point
+    })),
+  },
+  {
+    snapshotDate: "2024-09-01",
+    rows: mockValuationRows.slice(0, 8).map((row) => ({
+      ...row,
+      id: `hist-${row.id}-sep`,
+      onHandQty: Math.round(row.onHandQty * 0.3), // 30% of current stock
+      stockValue: Math.round(row.stockValue * 0.28),
+      unitCost: Math.round(row.unitCost * 0.88),
+      agingBucket: "0-30" as AgingBucket,
+    })),
+  },
+];
+
+// Get valuation for a specific date
+export function getValuationForDate(asOfDate: string): ValuationRow[] {
+  // If no date or today's date, return current data
+  const today = new Date().toISOString().split("T")[0];
+  if (!asOfDate || asOfDate >= today) {
+    return mockValuationRows;
+  }
+
+  // Find the closest snapshot that is on or before the asOfDate
+  const sortedSnapshots = [...mockHistoricalSnapshots].sort(
+    (a, b) => new Date(b.snapshotDate).getTime() - new Date(a.snapshotDate).getTime()
+  );
+
+  for (const snapshot of sortedSnapshots) {
+    if (snapshot.snapshotDate <= asOfDate) {
+      return snapshot.rows;
+    }
+  }
+
+  // If asOfDate is before all snapshots, return the oldest snapshot
+  const oldestSnapshot = sortedSnapshots[sortedSnapshots.length - 1];
+  if (oldestSnapshot) {
+    return oldestSnapshot.rows;
+  }
+
+  return mockValuationRows;
+}
+
+// Get available snapshot dates
+export function getAvailableSnapshotDates(): string[] {
+  const today = new Date().toISOString().split("T")[0];
+  return [today, ...mockHistoricalSnapshots.map((s) => s.snapshotDate)].sort(
+    (a, b) => new Date(b).getTime() - new Date(a).getTime()
+  );
+}
+
 // Product valuation details generator
-export function getProductValuationDetails(productId: string): ProductValuationDetails | null {
-  const row = mockValuationRows.find((r) => r.productId === productId);
+export function getProductValuationDetails(productId: string, asOfDate?: string): ProductValuationDetails | null {
+  const rows = asOfDate ? getValuationForDate(asOfDate) : mockValuationRows;
+  const row = rows.find((r) => r.productId === productId);
   if (!row) return null;
+
+  // For historical dates, filter movements and layers
+  let fifoLayers = mockFifoLayers[productId] || [];
+  let movements = mockMovements[productId] || [];
+
+  if (asOfDate) {
+    const asOfDateTime = new Date(asOfDate).getTime();
+    fifoLayers = fifoLayers.filter(
+      (layer) => new Date(layer.grnDate).getTime() <= asOfDateTime
+    );
+    movements = movements.filter(
+      (mov) => new Date(mov.dateTime.split("T")[0]).getTime() <= asOfDateTime
+    );
+  }
 
   return {
     productId: row.productId,
     productName: row.productName,
     sku: row.sku,
-    brandName: row.supplierName, // Using supplier as brand for mock
+    brandName: row.supplierName,
     categoryName: row.categoryName,
     supplierName: row.supplierName,
     costingMethod: row.costingMethod,
@@ -552,7 +646,7 @@ export function getProductValuationDetails(productId: string): ProductValuationD
     unitCost: row.unitCost,
     totalValue: row.stockValue,
     lastReceiptDate: row.lastReceiptDate,
-    fifoLayers: mockFifoLayers[productId] || [],
-    movements: mockMovements[productId] || [],
+    fifoLayers,
+    movements,
   };
 }

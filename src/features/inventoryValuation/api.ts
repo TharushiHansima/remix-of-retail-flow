@@ -13,6 +13,8 @@ import {
   mockCategories,
   mockSuppliers,
   getProductValuationDetails,
+  getValuationForDate,
+  getAvailableSnapshotDates,
 } from "./mock";
 
 // Simulate network delay
@@ -24,7 +26,13 @@ export async function getValuation(
 ): Promise<{ rows: ValuationRow[]; summary: ValuationSummary }> {
   await delay(800); // Simulate network
 
-  let rows = [...mockValuationRows];
+  // Get data based on asOfDate - this enables historical snapshots
+  let rows = filters.asOfDate 
+    ? [...getValuationForDate(filters.asOfDate)]
+    : [...mockValuationRows];
+
+  const today = new Date().toISOString().split("T")[0];
+  const isHistorical = filters.asOfDate && filters.asOfDate < today;
 
   // Apply filters
   if (filters.branchId) {
@@ -69,6 +77,8 @@ export async function getValuation(
       rows.length > 0
         ? rows.reduce((sum, r) => sum + r.unitCost, 0) / rows.length
         : 0,
+    snapshotDate: filters.asOfDate || today,
+    isHistorical: !!isHistorical,
   };
 
   return { rows, summary };
@@ -77,10 +87,16 @@ export async function getValuation(
 // Get product valuation details
 export async function getProductValuation(
   productId: string,
-  _filters?: ValuationFilters
+  filters?: ValuationFilters
 ): Promise<ProductValuationDetails | null> {
   await delay(600); // Simulate network
-  return getProductValuationDetails(productId);
+  return getProductValuationDetails(productId, filters?.asOfDate);
+}
+
+// Get available snapshot dates for historical reporting
+export async function getSnapshotDates(): Promise<string[]> {
+  await delay(200);
+  return getAvailableSnapshotDates();
 }
 
 // Get reference data

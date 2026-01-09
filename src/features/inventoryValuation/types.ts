@@ -87,6 +87,8 @@ export interface ValuationSummary {
   totalOnHandQty: number;
   totalStockValue: number;
   averageUnitCost: number;
+  snapshotDate?: string; // For historical point-in-time reporting
+  isHistorical?: boolean;
 }
 
 export interface Branch {
