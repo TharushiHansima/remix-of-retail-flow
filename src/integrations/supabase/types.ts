@@ -290,6 +290,113 @@ export type Database = {
           },
         ]
       }
+      cost_layer_consumptions: {
+        Row: {
+          consumed_at: string
+          consumption_id: string | null
+          consumption_number: string | null
+          consumption_type: string
+          cost_layer_id: string
+          created_at: string
+          id: string
+          quantity_consumed: number
+          total_cost: number
+          unit_cost_at_consumption: number
+        }
+        Insert: {
+          consumed_at?: string
+          consumption_id?: string | null
+          consumption_number?: string | null
+          consumption_type: string
+          cost_layer_id: string
+          created_at?: string
+          id?: string
+          quantity_consumed: number
+          total_cost: number
+          unit_cost_at_consumption: number
+        }
+        Update: {
+          consumed_at?: string
+          consumption_id?: string | null
+          consumption_number?: string | null
+          consumption_type?: string
+          cost_layer_id?: string
+          created_at?: string
+          id?: string
+          quantity_consumed?: number
+          total_cost?: number
+          unit_cost_at_consumption?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_layer_consumptions_cost_layer_id_fkey"
+            columns: ["cost_layer_id"]
+            isOneToOne: false
+            referencedRelation: "cost_layers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cost_layers: {
+        Row: {
+          branch_id: string
+          created_at: string
+          id: string
+          is_exhausted: boolean
+          product_id: string
+          received_date: string
+          received_qty: number
+          remaining_qty: number
+          source_id: string | null
+          source_number: string | null
+          source_type: string
+          unit_cost: number
+        }
+        Insert: {
+          branch_id: string
+          created_at?: string
+          id?: string
+          is_exhausted?: boolean
+          product_id: string
+          received_date?: string
+          received_qty?: number
+          remaining_qty?: number
+          source_id?: string | null
+          source_number?: string | null
+          source_type: string
+          unit_cost?: number
+        }
+        Update: {
+          branch_id?: string
+          created_at?: string
+          id?: string
+          is_exhausted?: boolean
+          product_id?: string
+          received_date?: string
+          received_qty?: number
+          remaining_qty?: number
+          source_id?: string | null
+          source_number?: string | null
+          source_type?: string
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cost_layers_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cost_layers_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -328,12 +435,14 @@ export type Database = {
       }
       grn: {
         Row: {
+          allocation_method: string | null
           branch_id: string
           created_at: string
           grn_number: string
           id: string
           invoice_date: string | null
           invoice_number: string | null
+          is_landed_cost_allocated: boolean
           landed_cost: number
           notes: string | null
           po_id: string | null
@@ -345,12 +454,14 @@ export type Database = {
           verified_at: string | null
         }
         Insert: {
+          allocation_method?: string | null
           branch_id: string
           created_at?: string
           grn_number: string
           id?: string
           invoice_date?: string | null
           invoice_number?: string | null
+          is_landed_cost_allocated?: boolean
           landed_cost?: number
           notes?: string | null
           po_id?: string | null
@@ -362,12 +473,14 @@ export type Database = {
           verified_at?: string | null
         }
         Update: {
+          allocation_method?: string | null
           branch_id?: string
           created_at?: string
           grn_number?: string
           id?: string
           invoice_date?: string | null
           invoice_number?: string | null
+          is_landed_cost_allocated?: boolean
           landed_cost?: number
           notes?: string | null
           po_id?: string | null
@@ -404,8 +517,10 @@ export type Database = {
       }
       grn_items: {
         Row: {
+          allocated_landed_cost: number
           batch_number: string | null
           expiry_date: string | null
+          final_unit_cost: number
           grn_id: string
           id: string
           ordered_quantity: number
@@ -413,11 +528,14 @@ export type Database = {
           product_id: string
           received_quantity: number
           serial_numbers: string[] | null
+          total_line_cost: number
           unit_cost: number
         }
         Insert: {
+          allocated_landed_cost?: number
           batch_number?: string | null
           expiry_date?: string | null
+          final_unit_cost?: number
           grn_id: string
           id?: string
           ordered_quantity?: number
@@ -425,11 +543,14 @@ export type Database = {
           product_id: string
           received_quantity: number
           serial_numbers?: string[] | null
+          total_line_cost?: number
           unit_cost: number
         }
         Update: {
+          allocated_landed_cost?: number
           batch_number?: string | null
           expiry_date?: string | null
+          final_unit_cost?: number
           grn_id?: string
           id?: string
           ordered_quantity?: number
@@ -437,6 +558,7 @@ export type Database = {
           product_id?: string
           received_quantity?: number
           serial_numbers?: string[] | null
+          total_line_cost?: number
           unit_cost?: number
         }
         Relationships: [
@@ -491,6 +613,95 @@ export type Database = {
             columns: ["grn_id"]
             isOneToOne: false
             referencedRelation: "grn"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_valuation_snapshots: {
+        Row: {
+          aging_bucket: string | null
+          available_qty: number
+          branch_id: string | null
+          category_id: string | null
+          costing_method: string
+          created_at: string
+          days_since_receipt: number | null
+          id: string
+          on_hand_qty: number
+          product_id: string
+          product_name: string
+          product_sku: string | null
+          reserved_qty: number
+          snapshot_date: string
+          supplier_id: string | null
+          total_value: number
+          unit_cost: number
+        }
+        Insert: {
+          aging_bucket?: string | null
+          available_qty?: number
+          branch_id?: string | null
+          category_id?: string | null
+          costing_method: string
+          created_at?: string
+          days_since_receipt?: number | null
+          id?: string
+          on_hand_qty?: number
+          product_id: string
+          product_name: string
+          product_sku?: string | null
+          reserved_qty?: number
+          snapshot_date: string
+          supplier_id?: string | null
+          total_value?: number
+          unit_cost?: number
+        }
+        Update: {
+          aging_bucket?: string | null
+          available_qty?: number
+          branch_id?: string | null
+          category_id?: string | null
+          costing_method?: string
+          created_at?: string
+          days_since_receipt?: number | null
+          id?: string
+          on_hand_qty?: number
+          product_id?: string
+          product_name?: string
+          product_sku?: string | null
+          reserved_qty?: number
+          snapshot_date?: string
+          supplier_id?: string | null
+          total_value?: number
+          unit_cost?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_valuation_snapshots_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_valuation_snapshots_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_valuation_snapshots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_valuation_snapshots_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -903,9 +1114,11 @@ export type Database = {
       }
       products: {
         Row: {
+          avg_cost: number
           brand_id: string | null
           category_id: string | null
           cost_price: number
+          costing_method: string
           created_at: string
           description: string | null
           id: string
@@ -919,13 +1132,16 @@ export type Database = {
           reorder_quantity: number | null
           sku: string
           unit_price: number
+          unit_weight: number | null
           updated_at: string
           wholesale_price: number
         }
         Insert: {
+          avg_cost?: number
           brand_id?: string | null
           category_id?: string | null
           cost_price?: number
+          costing_method?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -939,13 +1155,16 @@ export type Database = {
           reorder_quantity?: number | null
           sku: string
           unit_price?: number
+          unit_weight?: number | null
           updated_at?: string
           wholesale_price?: number
         }
         Update: {
+          avg_cost?: number
           brand_id?: string | null
           category_id?: string | null
           cost_price?: number
+          costing_method?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -959,6 +1178,7 @@ export type Database = {
           reorder_quantity?: number | null
           sku?: string
           unit_price?: number
+          unit_weight?: number | null
           updated_at?: string
           wholesale_price?: number
         }
@@ -1307,27 +1527,33 @@ export type Database = {
       }
       stock_levels: {
         Row: {
+          avg_unit_cost: number
           branch_id: string
           id: string
           product_id: string
           quantity: number
           reserved_quantity: number
+          total_value: number
           updated_at: string
         }
         Insert: {
+          avg_unit_cost?: number
           branch_id: string
           id?: string
           product_id: string
           quantity?: number
           reserved_quantity?: number
+          total_value?: number
           updated_at?: string
         }
         Update: {
+          avg_unit_cost?: number
           branch_id?: string
           id?: string
           product_id?: string
           quantity?: number
           reserved_quantity?: number
+          total_value?: number
           updated_at?: string
         }
         Relationships: [
@@ -1656,6 +1882,37 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      allocate_grn_landed_costs: {
+        Args: { p_grn_id: string }
+        Returns: undefined
+      }
+      calculate_cogs: {
+        Args: {
+          p_branch_id: string
+          p_consumption_id?: string
+          p_consumption_number?: string
+          p_consumption_type?: string
+          p_product_id: string
+          p_quantity: number
+        }
+        Returns: number
+      }
+      consume_fifo_layers: {
+        Args: {
+          p_branch_id: string
+          p_consumption_id: string
+          p_consumption_number: string
+          p_consumption_type: string
+          p_product_id: string
+          p_quantity: number
+        }
+        Returns: number
+      }
+      create_fifo_layers_from_grn: {
+        Args: { p_grn_id: string }
+        Returns: undefined
+      }
+      get_aging_bucket: { Args: { days_old: number }; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
