@@ -261,6 +261,7 @@ export const navigationConfig: NavItem[] = [
       { id: 'serials', title: 'Serial Registry', href: '/inventory/serials', featureId: 'serial_tracking' },
       { id: 'transfers', title: 'Stock Transfers', href: '/inventory/transfers', featureId: 'stock_transfers' },
       { id: 'adjustments', title: 'Stock Adjustments', href: '/inventory/adjustments', featureId: 'stock_adjustments' },
+      { id: 'valuation', title: 'Stock Valuation', href: '/inventory/valuation' },
     ],
   },
   {
