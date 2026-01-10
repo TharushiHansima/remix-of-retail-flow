@@ -23,6 +23,8 @@ import WarrantyJobs from "./pages/WarrantyJobs";
 import Customers from "./pages/Customers";
 import SalesReports from "./pages/SalesReports";
 import InventoryReports from "./pages/InventoryReports";
+import InventoryValuation from "./pages/InventoryValuation";
+import ProfitMarginReport from "./pages/ProfitMarginReport";
 import RepairReports from "./pages/RepairReports";
 import FinancialSummary from "./pages/FinancialSummary";
 import PurchaseOrders from "./pages/PurchaseOrders";
@@ -58,6 +60,7 @@ import PettyCash from "./pages/PettyCash";
 import ScheduledReports from "./pages/ScheduledReports";
 import StockLocations from "./pages/StockLocations";
 import PayablesAging from "./pages/PayablesAging";
+import StockValuation from "./pages/StockValuation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -89,6 +92,7 @@ const App = () => (
                     <Route path="/inventory/serials" element={<SerialRegistry />} />
                     <Route path="/inventory/transfers" element={<StockTransfers />} />
                     <Route path="/inventory/adjustments" element={<StockAdjustments />} />
+                    <Route path="/inventory/valuation" element={<StockValuation />} />
                     <Route path="/repairs/jobs" element={<JobCards />} />
                     <Route path="/repairs/board" element={<TechnicianBoard />} />
                     <Route path="/repairs/estimates" element={<Estimates />} />
@@ -100,6 +104,8 @@ const App = () => (
                     <Route path="/customers/history" element={<ServiceHistory />} />
                     <Route path="/reports/sales" element={<SalesReports />} />
                     <Route path="/reports/inventory" element={<InventoryReports />} />
+                    <Route path="/reports/valuation" element={<InventoryValuation />} />
+                    <Route path="/reports/margins" element={<ProfitMarginReport />} />
                     <Route path="/reports/repairs" element={<RepairReports />} />
                     <Route path="/reports/financial" element={<FinancialSummary />} />
                     <Route path="/reports/scheduled" element={<ScheduledReports />} />

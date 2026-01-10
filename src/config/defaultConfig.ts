@@ -261,6 +261,7 @@ export const navigationConfig: NavItem[] = [
       { id: 'serials', title: 'Serial Registry', href: '/inventory/serials', featureId: 'serial_tracking' },
       { id: 'transfers', title: 'Stock Transfers', href: '/inventory/transfers', featureId: 'stock_transfers' },
       { id: 'adjustments', title: 'Stock Adjustments', href: '/inventory/adjustments', featureId: 'stock_adjustments' },
+      { id: 'valuation', title: 'Stock Valuation', href: '/inventory/valuation' },
     ],
   },
   {
@@ -309,6 +310,8 @@ export const navigationConfig: NavItem[] = [
     children: [
       { id: 'sales', title: 'Sales Reports', href: '/reports/sales' },
       { id: 'inventory', title: 'Inventory Reports', href: '/reports/inventory' },
+      { id: 'valuation', title: 'Inventory Valuation', href: '/reports/valuation' },
+      { id: 'margins', title: 'Profit Margins', href: '/reports/margins' },
       { id: 'repairs', title: 'Repair Reports', href: '/reports/repairs' },
       { id: 'financial', title: 'Financial Summary', href: '/reports/financial' },
       { id: 'scheduled', title: 'Scheduled Reports', href: '/reports/scheduled' },

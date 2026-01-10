@@ -11,7 +11,10 @@ import {
   Truck,
   FileText,
   AlertTriangle,
+  Calculator,
+  Layers,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +22,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -46,10 +50,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
+import { LandedCostAllocationDialog } from "@/components/grn/LandedCostAllocationDialog";
 // CreateGRNDialog removed - GRN creation should come from PO flow
 
 // ✅ API
 import { listGrns, getGrn, setGrnVerification } from "@/features/procurement/grns/grns.api";
+import { createFifoLayersFromGrn } from "@/features/inventory/valuation/valuation.api";
 import type { GrnApi } from "@/features/procurement/grns/grns.types";
 
 interface GRNItem {
@@ -174,6 +180,7 @@ export default function GRN() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGRN, setSelectedGRN] = useState<GRN | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
   // GRN creation removed - GRN should be created from PO flow
 
   // ✅ real data
@@ -223,13 +230,21 @@ export default function GRN() {
   }
 
   async function verifyGrn(grnId: string) {
-    // ⚠️ if your backend expects different fields, share UpdateGrnVerificationDto and I’ll match it
-    await setGrnVerification(grnId, { status: "verified" });
-    await loadGrns({ search: searchQuery, status: statusFilter });
-
-    if (selectedGRN?.id === grnId) {
-      const full = await getGrn(grnId);
-      setSelectedGRN(mapGrn(full));
+    try {
+      await setGrnVerification(grnId, { status: "verified" });
+      try {
+        await createFifoLayersFromGrn(grnId);
+        toast.success("GRN verified and FIFO cost layers created");
+      } catch {
+        toast.success("GRN verified");
+      }
+      await loadGrns({ search: searchQuery, status: statusFilter });
+      if (selectedGRN?.id === grnId) {
+        const full = await getGrn(grnId);
+        setSelectedGRN(mapGrn(full));
+      }
+    } catch (error: any) {
+      toast.error("Failed to verify GRN");
     }
   }
 
@@ -377,6 +392,16 @@ export default function GRN() {
                               Verify GRN
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              openDetails(grn.id);
+                              setAllocationDialogOpen(true);
+                            }}
+                          >
+                            <Calculator className="mr-2 h-4 w-4" />
+                            Allocate Landed Costs
+                          </DropdownMenuItem>
                           <DropdownMenuItem>
                             <FileText className="mr-2 h-4 w-4" />
                             Print GRN
@@ -471,10 +496,21 @@ export default function GRN() {
                             <TabsContent value="landed-costs" className="space-y-4">
                               <div className="flex justify-between items-center">
                                 <h3 className="font-medium">Landed Cost Components</h3>
-                                <Button size="sm" variant="outline">
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  Add Cost
-                                </Button>
+                                <div className="flex gap-2">
+                                  <Button size="sm" variant="outline">
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Cost
+                                  </Button>
+                                  {selectedGRN.landedCosts.length > 0 && (
+                                    <Button 
+                                      size="sm" 
+                                      onClick={() => setAllocationDialogOpen(true)}
+                                    >
+                                      <Calculator className="h-4 w-4 mr-2" />
+                                      Allocate Costs
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
 
                               {selectedGRN.landedCosts.length > 0 ? (
@@ -564,6 +600,18 @@ export default function GRN() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Landed Cost Allocation Dialog */}
+      {selectedGRN && (
+        <LandedCostAllocationDialog
+          open={allocationDialogOpen}
+          onOpenChange={setAllocationDialogOpen}
+          grnId={selectedGRN.id}
+          grnNumber={selectedGRN.grnNumber}
+          totalLandedCost={selectedGRN.landedCost}
+          itemCount={selectedGRN.items.length}
+        />
+      )}
     </div>
   );
 }

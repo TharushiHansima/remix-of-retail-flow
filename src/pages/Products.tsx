@@ -11,6 +11,7 @@ import {
   Edit,
   Trash2,
   Package,
+  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -44,6 +46,8 @@ import { DeleteProductDialog } from "@/components/products/DeleteProductDialog";
 import { BulkStatusDialog } from "@/components/products/BulkStatusDialog";
 import { BulkCategoryDialog } from "@/components/products/BulkCategoryDialog";
 import { BulkDeleteDialog } from "@/components/products/BulkDeleteDialog";
+import { CostingMethodDialog } from "@/components/products/CostingMethodDialog";
+import { CostLayersDialog } from "@/components/products/CostLayersDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "sonner";
@@ -79,6 +83,9 @@ interface Product {
 
   // ✅ added (so mapApiProductToUi compiles and View/Edit dialogs can receive it)
   wholesalePrice: number;
+  
+  // ✅ Costing method
+  costingMethod: "fifo" | "weighted_average";
 
   stock: {
     main: number;
@@ -166,6 +173,7 @@ function mapApiProductToUi(
     price: toNumber(p.unitPrice ?? p.sellingPrice),
     wholesalePrice: toNumber((p as any).wholesalePrice), // ✅ add
     cost: toNumber(p.costPrice),
+    costingMethod: ((p as any).costing_method || (p as any).costingMethod || "weighted_average") as "fifo" | "weighted_average",
     stock, // ✅ from branches
     status,
   };
@@ -216,6 +224,8 @@ export default function Products() {
   const [bulkStatusDialogOpen, setBulkStatusDialogOpen] = useState(false);
   const [bulkCategoryDialogOpen, setBulkCategoryDialogOpen] = useState(false);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [costingMethodDialogOpen, setCostingMethodDialogOpen] = useState(false);
+  const [costLayersDialogOpen, setCostLayersDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   // ✅ backend data
@@ -546,6 +556,7 @@ export default function Products() {
               <TableHead>Product Name</TableHead>
               <TableHead>Category</TableHead>
               <TableHead>Type</TableHead>
+              <TableHead>Costing</TableHead>
               <TableHead className="text-right">Price</TableHead>
               <TableHead className="text-center">Stock (M/D/W)</TableHead>
               <TableHead>Status</TableHead>
@@ -571,6 +582,7 @@ export default function Products() {
                   </TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-20 mx-auto" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
@@ -579,7 +591,7 @@ export default function Products() {
               ))
             ) : filteredProducts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-48">
+                <TableCell colSpan={10} className="h-48">
                   <EmptyState
                     variant={searchQuery || categoryFilter !== "all" || brandFilter !== "all" ? "no-results" : "no-data"}
                     title={searchQuery ? "No products match your search" : "No products yet"}
@@ -613,6 +625,18 @@ export default function Products() {
                   <TableCell>
                     <Badge variant="outline">{typeLabels[product.type]}</Badge>
                   </TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant={product.costingMethod === "fifo" ? "default" : "secondary"}
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setCostingMethodDialogOpen(true);
+                      }}
+                    >
+                      {product.costingMethod === "fifo" ? "FIFO" : "Wtd Avg"}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right font-medium">
                     ${product.price.toFixed(2)}
                   </TableCell>
@@ -640,6 +664,28 @@ export default function Products() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit Product
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => {
+                            setSelectedProduct(product);
+                            setCostingMethodDialogOpen(true);
+                          }}
+                        >
+                          <Layers className="mr-2 h-4 w-4" />
+                          Change Costing Method
+                        </DropdownMenuItem>
+                        {product.costingMethod === "fifo" && (
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedProduct(product);
+                              setCostLayersDialogOpen(true);
+                            }}
+                          >
+                            <Layers className="mr-2 h-4 w-4" />
+                            View Cost Layers
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={async () => {
                             const newStatus = product.status === 'active' ? 'inactive' : 'active';
@@ -731,6 +777,23 @@ export default function Products() {
         selectedCount={selectedProducts.length}
         onConfirm={handleBulkDelete}
       />
+      {selectedProduct && (
+        <>
+          <CostingMethodDialog
+            open={costingMethodDialogOpen}
+            onOpenChange={setCostingMethodDialogOpen}
+            productId={selectedProduct.id}
+            productName={selectedProduct.name}
+            currentMethod={selectedProduct.costingMethod}
+          />
+          <CostLayersDialog
+            open={costLayersDialogOpen}
+            onOpenChange={setCostLayersDialogOpen}
+            productId={selectedProduct.id}
+            productName={selectedProduct.name}
+          />
+        </>
+      )}
     </div>
   );
 }
