@@ -60,6 +60,7 @@ import PettyCash from "./pages/PettyCash";
 import ScheduledReports from "./pages/ScheduledReports";
 import StockLocations from "./pages/StockLocations";
 import PayablesAging from "./pages/PayablesAging";
+import StockValuation from "./pages/StockValuation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -91,6 +92,7 @@ const App = () => (
                     <Route path="/inventory/serials" element={<SerialRegistry />} />
                     <Route path="/inventory/transfers" element={<StockTransfers />} />
                     <Route path="/inventory/adjustments" element={<StockAdjustments />} />
+                    <Route path="/inventory/valuation" element={<StockValuation />} />
                     <Route path="/repairs/jobs" element={<JobCards />} />
                     <Route path="/repairs/board" element={<TechnicianBoard />} />
                     <Route path="/repairs/estimates" element={<Estimates />} />
